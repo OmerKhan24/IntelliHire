@@ -1,0 +1,103 @@
+import os
+from datetime import datetime
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from config.config import config
+from models.models import db
+from routes.api_routes import register_blueprints, init_services
+import logging
+
+def create_app(config_name='development'):
+    """
+    Application factory pattern for Flask app creation
+    """
+    app = Flask(__name__)
+    
+    # Disable strict slashes globally
+    app.url_map.strict_slashes = False
+    
+    # Load configuration
+    app.config.from_object(config[config_name])
+    
+    # Setup logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Initialize extensions
+    db.init_app(app)
+    
+    # Enhanced CORS configuration - Allow access from network devices
+    CORS(app, 
+         origins=['http://localhost:3000', 'http://192.168.100.87:3000', 'http://127.0.0.1:3000'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+         allow_headers=['Content-Type', 'Authorization'],
+         supports_credentials=True)
+    
+    # Create upload directory
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    
+    # Initialize AI services
+    with app.app_context():
+        try:
+            init_services(app.config)
+            logging.info("✅ AI services initialized")
+        except Exception as e:
+            logging.warning(f"⚠️ Services initialization failed: {e}")
+    
+    # Register API blueprints
+    register_blueprints(app)
+    
+    # Create database tables
+    with app.app_context():
+        try:
+            db.create_all()
+            logging.info("✅ Database tables created")
+        except Exception as e:
+            logging.warning(f"⚠️ Database initialization failed: {e}")
+            logging.info("📝 Note: Start XAMPP MySQL server and create 'intellihire_db' database")
+    
+    @app.route('/')
+    def index():
+        return {
+            'message': 'IntelliHire API Server',
+            'version': '1.0.0',
+            'status': 'running',
+            'endpoints': {
+                'health': '/api/health',
+                'jobs': '/api/jobs',
+                'interviews': '/api/interviews',
+                'reports': '/api/reports'
+            }
+        }
+    
+    @app.errorhandler(404)
+    def not_found(error):
+        return {'error': 'Endpoint not found'}, 404
+    
+    @app.errorhandler(500)
+    def internal_error(error):
+        return {'error': 'Internal server error', 'message': str(error)}, 500
+    
+    return app
+
+if __name__ == '__main__':
+    # Get environment configuration
+    env = os.environ.get('FLASK_ENV', 'development')
+    
+    # Create app
+    app = create_app(env)
+    
+    # Run development server
+    print("🚀 Starting IntelliHire API Server...")
+    print(f"📡 Server running on: http://localhost:5000")
+    print(f"🌐 Frontend URL: http://localhost:3000")
+    print(f"🔧 Environment: {env}")
+    
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=True,
+        use_reloader=False  # Prevent double initialization of services
+    )
