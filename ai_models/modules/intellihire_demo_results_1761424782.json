@@ -1,0 +1,74 @@
+{
+  "candidate_info": {
+    "name": "John Doe",
+    "experience": "5 years Python development",
+    "skills": [
+      "Python",
+      "React",
+      "AWS",
+      "Machine Learning"
+    ]
+  },
+  "position_info": {
+    "title": "Senior Full Stack Developer",
+    "required_skills": [
+      "Python",
+      "JavaScript",
+      "React",
+      "AWS",
+      "Docker"
+    ],
+    "experience_level": "Senior"
+  },
+  "interview_summary": {
+    "duration": "45 minutes",
+    "questions_asked": 4,
+    "responses_analyzed": 3,
+    "monitoring_events": 5
+  },
+  "speech_analysis": {
+    "average_fluency": 0.7966666666666667,
+    "average_wpm": 145.0,
+    "total_filler_words": 4,
+    "communication_quality": "Good"
+  },
+  "competency_analysis": {
+    "average_confidence": 0.82,
+    "average_competency": 0.8366666666666668,
+    "technical_accuracy": 0.8733333333333334,
+    "strongest_area": "React/Frontend Development",
+    "development_areas": [
+      "Leadership Communication",
+      "ML Implementation Details"
+    ]
+  },
+  "integrity_monitoring": {
+    "total_violations": 5,
+    "critical_violations": 2,
+    "risk_level": "HIGH",
+    "concerning_behaviors": [
+      "Mobile phone detected during interview",
+      "Multiple faces detected (external help suspected)"
+    ]
+  },
+  "overall_assessment": {
+    "overall_score": 0.7673333333333334,
+    "recommendation": "CONSIDER",
+    "confidence_in_assessment": 0.87,
+    "key_strengths": [
+      "Strong technical knowledge in React and ML",
+      "Good problem-solving approach",
+      "Relevant experience for the role"
+    ],
+    "key_concerns": [
+      "Integrity violations during interview",
+      "Communication confidence varies by topic",
+      "Leadership examples need more detail"
+    ],
+    "next_steps": [
+      "Address integrity concerns in follow-up",
+      "Consider technical pair programming session",
+      "Reference check for leadership capabilities"
+    ]
+  }
+}
