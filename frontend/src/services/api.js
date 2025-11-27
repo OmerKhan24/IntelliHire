@@ -32,6 +32,11 @@ export const api = {
     getQuestions: (interviewId) => apiClient.get(`/api/interviews/${interviewId}/questions`),
     submitResponse: (interviewId, responseData) => apiClient.post(`/api/interviews/${interviewId}/response`, responseData),
     complete: (interviewId) => apiClient.post(`/api/interviews/${interviewId}/complete`),
+    uploadAudio: (formData) => {
+      return apiClient.post('/api/interviews/upload_audio', formData, {
+        headers: { 'Content-Type': undefined }
+      });
+    }
   },
 
   // Reports

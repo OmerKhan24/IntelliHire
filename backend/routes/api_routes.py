@@ -471,6 +471,83 @@ def submit_response(interview_id):
         return jsonify({'error': str(e)}), 500
 
 
+@interview_bp.route('/upload_audio', methods=['POST', 'OPTIONS'])
+def upload_audio():
+    """Upload and analyze audio recording of candidate's answer"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        logger.info(f"📤 Audio upload request - Files: {list(request.files.keys())}, Form: {dict(request.form)}")
+        
+        # Get audio file
+        audio_file = request.files.get('audio')
+        if not audio_file:
+            return jsonify({'error': 'No audio file provided'}), 400
+        
+        # Get response_id
+        response_id = request.form.get('response_id')
+        if not response_id:
+            return jsonify({'error': 'response_id required'}), 400
+        
+        # Create uploads directory
+        upload_folder = os.path.join(os.path.dirname(__file__), '..', 'uploads', 'audio')
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        # Generate unique filename
+        unique_filename = f"response_{response_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.webm"
+        audio_path = os.path.join(upload_folder, unique_filename)
+        
+        # Save audio file
+        audio_file.save(audio_path)
+        logger.info(f"💾 Audio saved: {audio_path}")
+        
+        # Analyze voice
+        try:
+            from services.voice_analysis_service import voice_analysis_service
+            voice_analysis = voice_analysis_service.analyze_audio_file(audio_path)
+            logger.info(f"🎤 Voice analysis: {voice_analysis.get('word_count')} words, {voice_analysis.get('speaking_pace')} WPM")
+        except Exception as analysis_err:
+            logger.error(f"⚠️ Voice analysis failed: {analysis_err}")
+            voice_analysis = {'error': str(analysis_err)}
+        
+        # Update response record
+        response = Response.query.get(response_id)
+        if response:
+            response.answer_audio_url = audio_path
+            response.voice_analysis_data = voice_analysis
+            
+            # Update communication score based on voice analysis
+            if not voice_analysis.get('error'):
+                # Blend existing score with voice analysis scores
+                voice_confidence = voice_analysis.get('confidence_score', 0)
+                voice_clarity = voice_analysis.get('clarity_score', 0)
+                
+                if response.communication_score:
+                    # Average with existing score
+                    response.communication_score = round(
+                        (response.communication_score + voice_confidence + voice_clarity) / 3, 2
+                    )
+                else:
+                    response.communication_score = round((voice_confidence + voice_clarity) / 2, 2)
+            
+            db.session.commit()
+            logger.info(f"✅ Audio analysis saved for response {response_id}")
+        
+        return jsonify({
+            'success': True,
+            'audio_url': audio_path,
+            'voice_analysis': voice_analysis
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Audio upload failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @interview_bp.route('/<int:interview_id>/complete', methods=['POST'])
 def complete_interview(interview_id):
     """Mark interview as completed and compute final score"""

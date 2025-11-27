@@ -433,6 +433,47 @@ const InterviewReport = () => {
                             <Typography variant="body2" sx={{ mb: 2, bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
                               {response.answer_text}
                             </Typography>
+                            
+                            {/* Voice Analysis Section */}
+                            {response.voice_analysis_data && !response.voice_analysis_data.error && (
+                              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.lighter', borderRadius: 1, border: '1px solid', borderColor: 'info.light' }}>
+                                <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  🎤 Voice Analysis
+                                </Typography>
+                                <Grid container spacing={2} sx={{ mt: 1 }}>
+                                  <Grid item xs={6} sm={3}>
+                                    <Typography variant="caption" color="text.secondary">Speaking Pace</Typography>
+                                    <Typography variant="body2" fontWeight="bold">
+                                      {response.voice_analysis_data.speaking_pace} WPM
+                                    </Typography>
+                                  </Grid>
+                                  <Grid item xs={6} sm={3}>
+                                    <Typography variant="caption" color="text.secondary">Clarity Score</Typography>
+                                    <Typography variant="body2" fontWeight="bold">
+                                      {response.voice_analysis_data.clarity_score}/100
+                                    </Typography>
+                                  </Grid>
+                                  <Grid item xs={6} sm={3}>
+                                    <Typography variant="caption" color="text.secondary">Confidence</Typography>
+                                    <Typography variant="body2" fontWeight="bold">
+                                      {response.voice_analysis_data.confidence_score}/100
+                                    </Typography>
+                                  </Grid>
+                                  <Grid item xs={6} sm={3}>
+                                    <Typography variant="caption" color="text.secondary">Filler Words</Typography>
+                                    <Typography variant="body2" fontWeight="bold">
+                                      {response.voice_analysis_data.filler_word_count}
+                                    </Typography>
+                                  </Grid>
+                                </Grid>
+                                {response.voice_analysis_data.analysis_summary && (
+                                  <Typography variant="caption" sx={{ mt: 2, display: 'block', fontStyle: 'italic' }}>
+                                    {response.voice_analysis_data.analysis_summary}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
+                            
                             {response.ai_feedback && (
                               <Box sx={{ mt: 2 }}>
                                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>

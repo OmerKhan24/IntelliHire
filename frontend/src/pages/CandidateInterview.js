@@ -58,10 +58,20 @@ const CandidateInterview = () => {
   const [videoEnabled, setVideoEnabled] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
   
+  // Voice features state
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [audioRecorder, setAudioRecorder] = useState(null);
+  const [audioChunks, setAudioChunks] = useState([]);
+  
   // Media refs
   const videoRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const synthRef = useRef(null);
+  const audioRecorderRef = useRef(null);
   
   // Warnings and monitoring
   const [warnings, setWarnings] = useState([]);
@@ -93,6 +103,19 @@ const CandidateInterview = () => {
     }
   }, [timeRemaining, step]);
 
+  // Auto-speak question when it changes
+  useEffect(() => {
+    if (step === 'interview' && questions.length > 0 && currentQuestionIndex < questions.length) {
+      const currentQuestion = questions[currentQuestionIndex];
+      if (currentQuestion && currentQuestion.question) {
+        // Auto-speak the question after a short delay
+        setTimeout(() => {
+          speakQuestion(currentQuestion.question);
+        }, 800);
+      }
+    }
+  }, [currentQuestionIndex, step, questions]);
+
   const loadJobDetails = async () => {
     try {
       const response = await api.jobs.get(jobId);
@@ -115,9 +138,158 @@ const CandidateInterview = () => {
       
       setVideoEnabled(true);
       setAudioEnabled(true);
+      
+      // Initialize Speech Recognition (STT)
+      initializeSpeechRecognition();
+      
+      // Initialize Text-to-Speech (TTS)
+      synthRef.current = window.speechSynthesis;
+      
     } catch (err) {
       console.error('Media access denied:', err);
       setError('Camera and microphone access is required for the interview. Please enable and refresh.');
+    }
+  };
+
+  const initializeSpeechRecognition = () => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+      
+      recognitionRef.current.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        if (finalTranscript) {
+          setCurrentAnswer(prev => prev + finalTranscript);
+          setVoiceTranscript('');
+        } else {
+          setVoiceTranscript(interimTranscript);
+        }
+      };
+      
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        if (event.error === 'no-speech') {
+          addWarning('No speech detected. Please speak clearly.', 'info');
+        }
+      };
+      
+      recognitionRef.current.onend = () => {
+        if (isListening) {
+          // Restart if still supposed to be listening
+          try {
+            recognitionRef.current.start();
+          } catch (err) {
+            console.error('Failed to restart recognition:', err);
+            setIsListening(false);
+          }
+        }
+      };
+      
+      console.log('✅ Speech recognition initialized');
+    } else {
+      console.warn('⚠️ Speech recognition not supported in this browser');
+    }
+  };
+
+  const toggleSpeechRecognition = () => {
+    if (!recognitionRef.current) {
+      addWarning('Speech recognition not available', 'error');
+      return;
+    }
+    
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      stopAudioRecording();
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+        startAudioRecording();
+      } catch (err) {
+        console.error('Failed to start recognition:', err);
+        addWarning('Failed to start voice recognition', 'error');
+      }
+    }
+  };
+
+  const speakQuestion = (questionText) => {
+    if (!synthRef.current) {
+      console.warn('Speech synthesis not available');
+      return;
+    }
+    
+    // Cancel any ongoing speech
+    synthRef.current.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(questionText);
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    utterance.lang = 'en-US';
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    synthRef.current.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  const startAudioRecording = () => {
+    if (!streamRef.current) return;
+    
+    try {
+      const mediaRecorder = new MediaRecorder(streamRef.current, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      audioRecorderRef.current = mediaRecorder;
+      const chunks = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        setAudioChunks(prev => [...prev, audioBlob]);
+      };
+      
+      mediaRecorder.start();
+      console.log('🎤 Audio recording started');
+    } catch (err) {
+      console.error('Failed to start audio recording:', err);
+    }
+  };
+
+  const stopAudioRecording = () => {
+    if (audioRecorderRef.current && audioRecorderRef.current.state === 'recording') {
+      audioRecorderRef.current.stop();
+      console.log('🎤 Audio recording stopped');
     }
   };
 
@@ -219,18 +391,49 @@ const CandidateInterview = () => {
     try {
       setLoading(true);
       
+      // Stop listening if active
+      if (isListening) {
+        toggleSpeechRecognition();
+      }
+      
       const currentQuestion = questions[currentQuestionIndex];
       
-      await api.interviews.submitAnswer(interview.id, {
+      // Submit text answer
+      const response = await api.interviews.submitResponse(interview.id, {
         question_id: currentQuestion.id,
-        answer_text: currentAnswer,
-        question_index: currentQuestionIndex
+        answer_text: currentAnswer
       });
       
+      // Upload audio recording if available
+      if (audioChunks.length > 0) {
+        try {
+          const audioBlob = audioChunks[audioChunks.length - 1];
+          const formData = new FormData();
+          formData.append('audio', audioBlob, `answer_${currentQuestionIndex}.webm`);
+          formData.append('response_id', response.data.response.id);
+          formData.append('interview_id', interview.id);
+          
+          await api.interviews.uploadAudio(formData);
+          console.log('🎤 Audio uploaded for voice analysis');
+        } catch (audioErr) {
+          console.error('⚠️ Audio upload failed:', audioErr);
+          // Continue even if audio upload fails
+        }
+      }
+      
       setCurrentAnswer('');
+      setVoiceTranscript('');
+      setAudioChunks([]);
       
       if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(prev => prev + 1);
+        const nextIndex = currentQuestionIndex + 1;
+        setCurrentQuestionIndex(nextIndex);
+        // Auto-read next question
+        setTimeout(() => {
+          if (questions[nextIndex]) {
+            speakQuestion(questions[nextIndex].question);
+          }
+        }, 500);
       } else {
         handleInterviewComplete();
       }
@@ -567,6 +770,50 @@ const CandidateInterview = () => {
                     </Paper>
                   )}
 
+                  {/* Voice Controls */}
+                  <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    <Button
+                      variant={isListening ? "contained" : "outlined"}
+                      color={isListening ? "error" : "primary"}
+                      startIcon={isListening ? <MicIcon /> : <MicOffIcon />}
+                      onClick={toggleSpeechRecognition}
+                      sx={{ flex: 1, minWidth: '200px' }}
+                    >
+                      {isListening ? '🎙️ Stop Speaking' : '🎤 Start Speaking'}
+                    </Button>
+                    
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      onClick={() => speakQuestion(questions[currentQuestionIndex]?.question)}
+                      disabled={isSpeaking}
+                      sx={{ flex: 1, minWidth: '200px' }}
+                    >
+                      {isSpeaking ? '🔊 Speaking...' : '🔊 Replay Question'}
+                    </Button>
+                    
+                    {isSpeaking && (
+                      <Button
+                        variant="outlined"
+                        color="warning"
+                        onClick={stopSpeaking}
+                        size="small"
+                      >
+                        ⏸️ Stop
+                      </Button>
+                    )}
+                  </Box>
+
+                  {/* Live transcription indicator */}
+                  {isListening && (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <MicIcon sx={{ animation: 'pulse 1.5s infinite' }} />
+                        <span>Listening... {voiceTranscript && `"${voiceTranscript}"`}</span>
+                      </Box>
+                    </Alert>
+                  )}
+
                   <TextField
                     fullWidth
                     multiline
@@ -574,7 +821,7 @@ const CandidateInterview = () => {
                     label="Your Answer"
                     value={currentAnswer}
                     onChange={(e) => setCurrentAnswer(e.target.value)}
-                    placeholder="Type your answer here... You can also speak your answer if you prefer."
+                    placeholder="Type your answer here or use the 'Start Speaking' button to answer by voice..."
                     sx={{ mb: 3 }}
                   />
 

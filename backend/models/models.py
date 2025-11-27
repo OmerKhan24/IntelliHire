@@ -123,6 +123,7 @@ class Response(db.Model):
     answer_audio_url = db.Column(db.String(500))
     answer_video_url = db.Column(db.String(500))
     answer_duration = db.Column(db.Integer)
+    voice_analysis_data = db.Column(db.JSON)  # Store voice metrics
     confidence_score = db.Column(db.Float)
     relevance_score = db.Column(db.Float)
     technical_score = db.Column(db.Float)
@@ -144,7 +145,8 @@ class Response(db.Model):
             'answer_text': self.answer_text, 
             'answer_audio_url': self.answer_audio_url, 
             'answer_video_url': self.answer_video_url, 
-            'answer_duration': self.answer_duration, 
+            'answer_duration': self.answer_duration,
+            'voice_analysis_data': self.voice_analysis_data or {},
             'confidence_score': self.confidence_score, 
             'relevance_score': self.relevance_score, 
             'technical_score': self.technical_score, 
