@@ -5,7 +5,12 @@ from flask_cors import CORS
 from config.config import config
 from models.models import db
 from routes.api_routes import register_blueprints, init_services
+from flask_jwt_extended import JWTManager
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 def create_app(config_name='development'):
     """
@@ -27,10 +32,31 @@ def create_app(config_name='development'):
     
     # Initialize extensions
     db.init_app(app)
+    # JWT setup
+    app.config.setdefault('JWT_SECRET_KEY', app.config.get('SECRET_KEY', 'change-me'))
+    app.config['JWT_CSRF_CHECK_FORM'] = False
+    app.config['JWT_COOKIE_CSRF_PROTECT'] = False
+    jwt = JWTManager(app)
+    
+    # JWT error handlers
+    @jwt.unauthorized_loader
+    def unauthorized_callback(error_string):
+        logging.warning(f"⚠️ Unauthorized access attempt: {error_string}")
+        return jsonify({'error': 'Missing or invalid token', 'message': error_string}), 401
+    
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error_string):
+        logging.warning(f"⚠️ Invalid token: {error_string}")
+        return jsonify({'error': 'Invalid token', 'message': error_string}), 422
+    
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_data):
+        logging.warning(f"⚠️ Expired token")
+        return jsonify({'error': 'Token has expired'}), 401
     
     # Enhanced CORS configuration - Allow access from network devices
     CORS(app, 
-         origins=['http://localhost:3000', 'http://192.168.100.87:3000', 'http://127.0.0.1:3000'],
+         origins=['http://localhost:3000', 'http://192.168.100.80:3000', 'http://127.0.0.1:3000'],
          methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
          allow_headers=['Content-Type', 'Authorization'],
          supports_credentials=True)

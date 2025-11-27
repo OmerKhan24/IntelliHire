@@ -9,7 +9,7 @@ import sys
 import json
 import time
 import tempfile
-import pygame
+# import pygame
 from pathlib import Path
 
 # Set up the API key

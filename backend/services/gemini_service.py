@@ -19,12 +19,41 @@ class GeminiService:
             self.enabled = False
             print("GEMINI_API_KEY not found - running in fallback mode")
     
-    async def generate_questions(self, job_description, requirements, num_questions=5):
+    async def generate_questions(self, job_description, requirements, num_questions=5, cv_text=None):
+        """
+        Generate interview questions with RAG using candidate's CV
+        
+        Args:
+            job_description: Job description text
+            requirements: Job requirements
+            num_questions: Number of questions to generate
+            cv_text: Candidate's CV text for personalized RAG-powered questions
+        """
         if not self.enabled:
             return self._generate_fallback_questions(job_description, requirements, num_questions)
         
         try:
-            prompt = f"""Generate {num_questions} interview questions for the following job:
+            if cv_text:
+                # RAG-powered: Generate personalized questions based on CV
+                prompt = f"""You are an expert interviewer. Generate {num_questions} highly personalized interview questions.
+
+Job Description: {job_description[:500]}
+Requirements: {requirements[:500]}
+
+Candidate's CV:
+{cv_text[:1500]}
+
+Generate questions that:
+1. Reference specific experiences/projects from their CV
+2. Assess skills they claim to have
+3. Explore gaps or transitions in their background
+4. Test depth of knowledge in areas they mention
+5. Evaluate fit for this specific role
+
+Return ONLY numbered questions (1-{num_questions}), make them specific to this candidate's background."""
+            else:
+                # Generic questions without CV
+                prompt = f"""Generate {num_questions} interview questions for the following job:
 Job Description: {job_description}
 Requirements: {requirements}
 
