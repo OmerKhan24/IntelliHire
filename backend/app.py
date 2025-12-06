@@ -57,9 +57,24 @@ def create_app(config_name='development'):
         logging.warning(f"⚠️ Expired token")
         return jsonify({'error': 'Token has expired'}), 401
     
-    # Enhanced CORS configuration - Allow access from network devices
+    # Enhanced CORS configuration - Allow access from network devices and deployed frontend
+    allowed_origins = [
+        'http://localhost:3000',
+        'http://192.168.100.80:3000',
+        'http://127.0.0.1:3000',
+        'http://192.168.100.80:5000',
+    ]
+    
+    # Add production frontend URL from environment variable
+    frontend_url = os.environ.get('FRONTEND_URL')
+    if frontend_url:
+        allowed_origins.append(frontend_url)
+        # Also add https version if http is provided
+        if frontend_url.startswith('http://'):
+            allowed_origins.append(frontend_url.replace('http://', 'https://'))
+    
     CORS(app, 
-         origins=['http://localhost:3000', 'http://192.168.100.80:3000', 'http://127.0.0.1:3000', 'http://192.168.100.80:5000'],
+         origins=allowed_origins,
          methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
          allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
          expose_headers=['Content-Type', 'Authorization'],
@@ -102,6 +117,22 @@ def create_app(config_name='development'):
                 'reports': '/api/reports'
             }
         }
+    
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint for Render and other deployment platforms"""
+        try:
+            # Check database connection
+            db.session.execute('SELECT 1')
+            db_status = 'connected'
+        except Exception as e:
+            db_status = f'error: {str(e)}'
+        
+        return {
+            'status': 'healthy',
+            'database': db_status,
+            'timestamp': datetime.utcnow().isoformat()
+        }, 200
     
     @app.errorhandler(404)
     def not_found(error):
