@@ -177,16 +177,22 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 - For production, consider paid plans ($7-25/month)
 
 ### Database Migration
-Your local MySQL database needs to be migrated to PostgreSQL for Render:
 
-1. Export your MySQL data
-2. Convert to PostgreSQL format
-3. Import to Render PostgreSQL
+⚠️ **Important:** Your local MySQL database needs to be migrated for production.
 
-Or use a MySQL hosting service like:
-- PlanetScale (free tier)
-- Railway (with MySQL)
-- ClearDB (Heroku addon)
+**See detailed instructions in:** [`DATABASE_MIGRATION.md`](./DATABASE_MIGRATION.md)
+
+**Quick Options:**
+1. **Migrate to PostgreSQL** (Render's native database) - See migration guide
+2. **Use PlanetScale** (MySQL hosting, no conversion needed)
+3. **Use Railway** (supports MySQL natively)
+
+The `DATABASE_MIGRATION.md` file includes:
+- Step-by-step MySQL → PostgreSQL conversion
+- SQL syntax differences
+- Migration scripts
+- Alternative MySQL hosting options
+- Database connection testing
 
 ---
 

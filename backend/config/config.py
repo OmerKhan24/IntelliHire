@@ -9,8 +9,20 @@ class Config:
     DEBUG = False
     
     # Database Configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'mysql+pymysql://root:@localhost/intellihire_db'
+    # Support both MySQL (local) and PostgreSQL (production)
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if database_url:
+        # Production: Use DATABASE_URL from environment
+        # Render uses postgres://, but SQLAlchemy needs postgresql://
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        SQLALCHEMY_DATABASE_URI = database_url
+    else:
+        # Development: Use local MySQL (change 'intellihire_db' to 'intellihire_dev' if needed)
+        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI') or \
+            'mysql+pymysql://root:@localhost/intellihire_dev'
+    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_recycle': 300,
