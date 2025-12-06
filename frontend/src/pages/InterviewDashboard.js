@@ -29,7 +29,8 @@ import {
   Person as PersonIcon,
   Work as WorkIcon,
   Schedule as ScheduleIcon,
-  Star as StarIcon
+  Star as StarIcon,
+  SmartToy as BotIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
@@ -127,12 +128,25 @@ const InterviewDashboard = () => {
   return (
     <Container maxWidth="lg">
       <Box sx={{ py: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Interview Dashboard
-        </Typography>
-        <Typography color="text.secondary" paragraph>
-          Manage your interview jobs and view candidate results
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box>
+            <Typography variant="h4" component="h1" gutterBottom>
+              HR Dashboard
+            </Typography>
+            <Typography color="text.secondary">
+              Manage interviews, employees, and company documents
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<BotIcon />}
+            onClick={() => navigate('/hr-assistant')}
+            size="large"
+          >
+            HR Assistant
+          </Button>
+        </Box>
 
         {error && (
           <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>

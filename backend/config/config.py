@@ -26,6 +26,7 @@ class Config:
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
     GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY') or 'AIzaSyBqOr81H2O5eGjGhKcZk9urE2SAfnTMTAI'
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY') or 'AIzaSyBqOr81H2O5eGjGhKcZk9urE2SAfnTMTAI'
+    GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')  # GitHub Copilot API for question generation/scoring
     ELEVENLABS_API_KEY = os.environ.get('ELEVENLABS_API_KEY')
     
     # Gemini Configuration
@@ -73,6 +74,14 @@ class Config:
     CHUNK_SIZE = 1000
     CHUNK_OVERLAP = 200
     VECTOR_STORE_PATH = 'data/vectorstore'
+    
+    # HR Assistant Configuration
+    HR_DOCUMENTS_PATH = os.environ.get('HR_DOCUMENTS_PATH') or 'uploads/hr_documents'
+    CHROMA_DB_PATH = os.environ.get('CHROMA_DB_PATH') or 'chroma_db'
+    CHROMA_COLLECTION_NAME = os.environ.get('CHROMA_COLLECTION_NAME') or 'hr_documents'
+    HR_CHUNK_SIZE = 500  # Smaller chunks for precise HR info
+    HR_CHUNK_OVERLAP = 50
+    HR_TOP_K_RESULTS = 5  # Number of relevant chunks to retrieve
     
     # Scoring Configuration
     SCORING_WEIGHTS = {

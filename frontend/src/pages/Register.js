@@ -15,7 +15,8 @@ const Register = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('candidate');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -24,9 +25,10 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    const result = await register(username, email, password, role);
+    const result = await register(username, email, password, 'candidate', fullName, phone);
     if (result.success) {
-      navigate('/');
+      alert('Candidate account created successfully! Please login.');
+      navigate('/login');
     } else {
       setError(result.error);
     }
@@ -106,10 +108,10 @@ const Register = () => {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              Join IntelliHire
+              Create Account
             </Typography>
             <Typography variant="body1" sx={{ color: alpha('#fff', 0.9) }}>
-              Create your account to get started
+              Join IntelliHire as a candidate
             </Typography>
           </Box>
 
@@ -131,6 +133,33 @@ const Register = () => {
           )}
 
           <Box component="form" onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              label="Full Name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              sx={{
+                mb: 2.5,
+                '& .MuiOutlinedInput-root': {
+                  background: alpha('#fff', 0.1),
+                  backdropFilter: 'blur(10px)',
+                  color: '#fff',
+                  '& fieldset': { borderColor: alpha('#fff', 0.3) },
+                  '&:hover fieldset': { borderColor: alpha('#fff', 0.5) },
+                  '&.Mui-focused fieldset': { borderColor: '#FFD700' }
+                },
+                '& .MuiInputLabel-root': { color: alpha('#fff', 0.7) },
+                '& .MuiInputLabel-root.Mui-focused': { color: '#FFD700' }
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonIcon sx={{ color: alpha('#fff', 0.7) }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+
             <TextField
               fullWidth
               label="Username"
@@ -188,6 +217,33 @@ const Register = () => {
 
             <TextField
               fullWidth
+              label="Phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              sx={{
+                mb: 2.5,
+                '& .MuiOutlinedInput-root': {
+                  background: alpha('#fff', 0.1),
+                  backdropFilter: 'blur(10px)',
+                  color: '#fff',
+                  '& fieldset': { borderColor: alpha('#fff', 0.3) },
+                  '&:hover fieldset': { borderColor: alpha('#fff', 0.5) },
+                  '&.Mui-focused fieldset': { borderColor: '#FFD700' }
+                },
+                '& .MuiInputLabel-root': { color: alpha('#fff', 0.7) },
+                '& .MuiInputLabel-root.Mui-focused': { color: '#FFD700' }
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <WorkIcon sx={{ color: alpha('#fff', 0.7) }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            <TextField
+              fullWidth
               label="Password"
               type={showPassword ? 'text' : 'password'}
               value={password}
@@ -224,38 +280,6 @@ const Register = () => {
                 ),
               }}
             />
-
-            <TextField
-              select
-              fullWidth
-              label="I am a..."
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              sx={{
-                mb: 4,
-                '& .MuiOutlinedInput-root': {
-                  background: alpha('#fff', 0.1),
-                  backdropFilter: 'blur(10px)',
-                  color: '#fff',
-                  '& fieldset': { borderColor: alpha('#fff', 0.3) },
-                  '&:hover fieldset': { borderColor: alpha('#fff', 0.5) },
-                  '&.Mui-focused fieldset': { borderColor: '#FFD700' }
-                },
-                '& .MuiInputLabel-root': { color: alpha('#fff', 0.7) },
-                '& .MuiInputLabel-root.Mui-focused': { color: '#FFD700' },
-                '& .MuiSvgIcon-root': { color: alpha('#fff', 0.7) }
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <WorkIcon sx={{ color: alpha('#fff', 0.7) }} />
-                  </InputAdornment>
-                ),
-              }}
-            >
-              <MenuItem value="candidate">Candidate</MenuItem>
-              <MenuItem value="interviewer">Interviewer</MenuItem>
-            </TextField>
 
             <Button
               variant="contained"

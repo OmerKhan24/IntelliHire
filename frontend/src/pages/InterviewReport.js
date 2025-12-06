@@ -56,7 +56,7 @@ const InterviewReport = () => {
       setLoading(true);
       const [jobResponse, reportResponse] = await Promise.all([
         api.jobs.get(jobId),
-        api.reports.getJobReport(jobId)
+        api.reports.getJob(jobId)
       ]);
       
       setJob(jobResponse.data.job);
@@ -409,6 +409,142 @@ const InterviewReport = () => {
                               </Grid>
                             ))}
                           </Grid>
+                        </Box>
+                      )}
+
+                      {/* CV Monitoring Report */}
+                      {selectedInterview.cv_monitoring_report && selectedInterview.cv_monitoring_report.success && (
+                        <Box sx={{ mt: 3 }}>
+                          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <WarningIcon /> CV Monitoring Report
+                          </Typography>
+                          
+                          {/* Monitoring Summary Stats */}
+                          <Grid container spacing={2} sx={{ mb: 3 }}>
+                            <Grid item xs={6} sm={3}>
+                              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'background.default' }}>
+                                <Typography variant="h4" color={
+                                  selectedInterview.cv_monitoring_report.risk_level === 'low' ? 'success.main' :
+                                  selectedInterview.cv_monitoring_report.risk_level === 'medium' ? 'warning.main' :
+                                  selectedInterview.cv_monitoring_report.risk_level === 'high' ? 'error.main' : 'error.dark'
+                                }>
+                                  {(selectedInterview.cv_monitoring_report.final_risk_score * 100).toFixed(1)}%
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">Risk Score</Typography>
+                              </Paper>
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'background.default' }}>
+                                <Typography variant="h4">
+                                  {selectedInterview.cv_monitoring_report.total_warnings || 0}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">Total Warnings</Typography>
+                              </Paper>
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'background.default' }}>
+                                <Typography variant="h4">
+                                  {selectedInterview.cv_monitoring_report.total_frames_analyzed || 0}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">Frames Analyzed</Typography>
+                              </Paper>
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'background.default' }}>
+                                <Chip 
+                                  label={selectedInterview.cv_monitoring_report.risk_level?.toUpperCase() || 'N/A'} 
+                                  color={
+                                    selectedInterview.cv_monitoring_report.risk_level === 'low' ? 'success' :
+                                    selectedInterview.cv_monitoring_report.risk_level === 'medium' ? 'warning' :
+                                    selectedInterview.cv_monitoring_report.risk_level === 'high' ? 'error' : 'error'
+                                  }
+                                  sx={{ mt: 1 }}
+                                />
+                                <Typography variant="caption" color="text.secondary" display="block">Risk Level</Typography>
+                              </Paper>
+                            </Grid>
+                          </Grid>
+
+                          {/* Detection Breakdown */}
+                          {selectedInterview.cv_monitoring_report.detection_breakdown && (
+                            <Box sx={{ mb: 2 }}>
+                              <Typography variant="subtitle1" gutterBottom>Detection Breakdown</Typography>
+                              <Grid container spacing={1}>
+                                {Object.entries(selectedInterview.cv_monitoring_report.detection_breakdown).map(([type, count]) => (
+                                  <Grid item xs={6} sm={4} key={type}>
+                                    <Paper sx={{ p: 1.5, display: 'flex', justifyContent: 'space-between' }}>
+                                      <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
+                                        {type.replace('_', ' ')}
+                                      </Typography>
+                                      <Chip label={count} size="small" />
+                                    </Paper>
+                                  </Grid>
+                                ))}
+                              </Grid>
+                            </Box>
+                          )}
+
+                          {/* Alert Level Breakdown */}
+                          {selectedInterview.cv_monitoring_report.alert_level_breakdown && (
+                            <Box sx={{ mb: 2 }}>
+                              <Typography variant="subtitle1" gutterBottom>Alert Severity</Typography>
+                              <Grid container spacing={1}>
+                                {Object.entries(selectedInterview.cv_monitoring_report.alert_level_breakdown).map(([level, count]) => (
+                                  <Grid item xs={6} sm={3} key={level}>
+                                    <Paper sx={{ 
+                                      p: 1.5, 
+                                      bgcolor: level === 'critical' ? 'error.lighter' : 
+                                              level === 'high' ? 'warning.lighter' : 
+                                              level === 'medium' ? 'info.lighter' : 'success.lighter',
+                                      textAlign: 'center'
+                                    }}>
+                                      <Typography variant="h5">{count}</Typography>
+                                      <Typography variant="caption" sx={{ textTransform: 'capitalize' }}>{level}</Typography>
+                                    </Paper>
+                                  </Grid>
+                                ))}
+                              </Grid>
+                            </Box>
+                          )}
+
+                          {/* Critical Events */}
+                          {selectedInterview.cv_monitoring_report.critical_events && 
+                           selectedInterview.cv_monitoring_report.critical_events.length > 0 && (
+                            <Box>
+                              <Typography variant="subtitle1" gutterBottom color="error">
+                                Critical Events with Screenshots
+                              </Typography>
+                              {selectedInterview.cv_monitoring_report.critical_events.map((event, idx) => (
+                                <Alert severity="error" key={idx} sx={{ mb: 2 }}>
+                                  <Typography variant="body2">
+                                    <strong>{event.type?.replace('_', ' ').toUpperCase()}</strong>: {event.message}
+                                  </Typography>
+                                  {event.timestamp && (
+                                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                                      {new Date(event.timestamp).toLocaleString()}
+                                    </Typography>
+                                  )}
+                                  {event.screenshot && (
+                                    <Box sx={{ mt: 2 }}>
+                                      <img 
+                                        src={`http://localhost:5000/api/monitoring/screenshots/${event.screenshot.split('/').pop()}`}
+                                        alt={`${event.type} detection`}
+                                        style={{ 
+                                          maxWidth: '100%', 
+                                          maxHeight: '300px', 
+                                          borderRadius: '8px',
+                                          border: '2px solid #f44336'
+                                        }}
+                                        onError={(e) => {
+                                          e.target.style.display = 'none';
+                                        }}
+                                      />
+                                    </Box>
+                                  )}
+                                </Alert>
+                              ))}
+                            </Box>
+                          )}
                         </Box>
                       )}
                     </Box>

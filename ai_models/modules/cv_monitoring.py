@@ -238,6 +238,9 @@ class CVMonitoringSystem:
             # Run YOLO detection
             detections = self.yolo_model(frame, verbose=False)
             
+            # Count persons detected (to identify multiple people)
+            person_count = 0
+            
             # Analyze detected objects
             for detection in detections:
                 boxes = detection.boxes
@@ -249,8 +252,12 @@ class CVMonitoringSystem:
                         if confidence > self.config["confidence_threshold"]:
                             class_name = self.yolo_model.names[class_id]
                             
-                            # Check for suspicious objects
-                            if class_name in ['cell phone', 'laptop', 'book', 'person']:
+                            # Count persons
+                            if class_name == 'person':
+                                person_count += 1
+                            
+                            # Check for suspicious objects (exclude person, handle separately)
+                            if class_name in ['cell phone', 'laptop', 'book']:
                                 alert_level = self._get_object_alert_level(class_name, confidence)
                                 
                                 if class_name == 'cell phone':
@@ -268,6 +275,19 @@ class CVMonitoringSystem:
                                         "detection_count": self.phone_detection_count if class_name == 'cell phone' else 1
                                     }
                                 ))
+            
+            # Only flag if multiple persons detected (more than the candidate)
+            if person_count > 1:
+                results.append(DetectionResult(
+                    timestamp=timestamp,
+                    alert_level=AlertLevel.CRITICAL,
+                    detection_type="multiple_persons_detected",
+                    confidence=0.9,
+                    details={
+                        "message": f"Multiple persons in frame: {person_count}",
+                        "person_count": person_count
+                    }
+                ))
             
             return results
             
@@ -372,8 +392,6 @@ class CVMonitoringSystem:
             return AlertLevel.HIGH if confidence > 0.7 else AlertLevel.MEDIUM
         elif object_class == 'book':
             return AlertLevel.MEDIUM
-        elif object_class == 'person':
-            return AlertLevel.HIGH if confidence > 0.8 else AlertLevel.MEDIUM
         else:
             return AlertLevel.LOW
     

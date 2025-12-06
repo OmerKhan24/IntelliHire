@@ -30,6 +30,8 @@ import {
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { useCVMonitoring } from '../hooks/useCVMonitoring';
+import MonitoringAlert from '../components/MonitoringAlert';
 
 const CandidateInterview = () => {
   const { jobId } = useParams();
@@ -46,7 +48,8 @@ const CandidateInterview = () => {
   const [candidateInfo, setCandidateInfo] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    cvFile: null
   });
   
   // Interview state
@@ -77,6 +80,16 @@ const CandidateInterview = () => {
   const [warnings, setWarnings] = useState([]);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [showWarning, setShowWarning] = useState(false);
+
+  // CV Monitoring integration
+  const {
+    monitoring,
+    recentWarning,
+    startMonitoring,
+    stopMonitoring,
+    getWarningStats,
+    clearWarning
+  } = useCVMonitoring(interview?.id, videoRef, true); // Always enabled when interview exists
 
   useEffect(() => {
     loadJobDetails();
@@ -115,6 +128,45 @@ const CandidateInterview = () => {
       }
     }
   }, [currentQuestionIndex, step, questions]);
+
+  // Ensure video stream is connected when interview starts
+  useEffect(() => {
+    if (step === 'interview' && videoRef.current && streamRef.current) {
+      console.log('🎥 Reconnecting video stream for interview...');
+      videoRef.current.srcObject = streamRef.current;
+      
+      // Ensure video plays
+      videoRef.current.play().catch(err => {
+        console.error('Failed to play video:', err);
+      });
+      
+      console.log('✅ Video stream reconnected for interview');
+      
+      // Start CV monitoring AFTER video is ready
+      if (interview?.id && !monitoring.active) {
+        console.log('🎥 Video ready, starting CV monitoring...');
+        startMonitoring(interview.id).then(() => {
+          console.log('✅ CV monitoring started after video setup');
+        }).catch(err => {
+          console.warn('⚠️ CV monitoring failed to start:', err);
+        });
+      }
+    }
+  }, [step, interview, monitoring.active, startMonitoring]);
+
+  // Ensure video persists when question changes
+  useEffect(() => {
+    if (step === 'interview' && videoRef.current && streamRef.current) {
+      // Reassign srcObject to maintain video across questions
+      if (!videoRef.current.srcObject || videoRef.current.srcObject !== streamRef.current) {
+        console.log(`🎥 Reassigning video for question ${currentQuestionIndex + 1}...`);
+        videoRef.current.srcObject = streamRef.current;
+        videoRef.current.play().catch(err => {
+          console.error('Failed to play video:', err);
+        });
+      }
+    }
+  }, [currentQuestionIndex, step]);
 
   const loadJobDetails = async () => {
     try {
@@ -321,8 +373,8 @@ const CandidateInterview = () => {
   };
 
   const startInterview = async () => {
-    if (!candidateInfo.name || !candidateInfo.email) {
-      setError('Please provide your name and email to continue');
+    if (!candidateInfo.name || !candidateInfo.email || !candidateInfo.cvFile) {
+      setError('Please provide your name, email, and CV file to continue');
       return;
     }
 
@@ -330,19 +382,50 @@ const CandidateInterview = () => {
       setLoading(true);
       
       // Start interview
-      const interviewResponse = await api.interviews.start(jobId, candidateInfo);
+      const interviewResponse = await api.interviews.start({
+        job_id: jobId,
+        candidate_name: candidateInfo.name,
+        candidate_email: candidateInfo.email,
+        candidate_phone: candidateInfo.phone
+      });
       setInterview(interviewResponse.data.interview);
       
-      // Get questions
+      // Upload CV with interview_id
+      const formData = new FormData();
+      formData.append('file', candidateInfo.cvFile);
+      formData.append('interview_id', interviewResponse.data.interview.id);
+      
+      console.log('📤 Uploading CV with interview_id:', interviewResponse.data.interview.id);
+      console.log('📄 CV File:', candidateInfo.cvFile.name, candidateInfo.cvFile.size, 'bytes');
+      
+      try {
+        await api.candidate.uploadCV(formData);
+        console.log('✅ CV uploaded successfully for RAG processing');
+      } catch (cvError) {
+        console.error('⚠️ CV upload failed:', cvError);
+        // Continue anyway - questions will be generic without RAG
+      }
+      
+      // Get questions (will use CV for RAG if uploaded)
       const questionsResponse = await api.interviews.getQuestions(interviewResponse.data.interview.id);
+      console.log('Questions response:', questionsResponse.data);
+      console.log('Questions array:', questionsResponse.data.questions);
+      
+      if (!questionsResponse.data.questions || questionsResponse.data.questions.length === 0) {
+        throw new Error('No questions returned from API');
+      }
+      
       setQuestions(questionsResponse.data.questions);
       
       // Set timer
       setTimeRemaining(job.duration_minutes * 60);
-      setStep('interview');
       
       // Start recording
       startRecording();
+      
+      // Change to interview step (this will trigger video reconnection and CV monitoring)
+      // CV monitoring will start automatically after video is ready (see useEffect above)
+      setStep('interview');
       
     } catch (err) {
       setError('Failed to start interview: ' + (err.response?.data?.error || err.message));
@@ -451,9 +534,25 @@ const CandidateInterview = () => {
         mediaRecorderRef.current.stop();
       }
       
+      // Stop CV monitoring and get report
+      console.log('🏁 Stopping CV monitoring...');
+      const monitoringReport = await stopMonitoring();
+      
+      if (monitoringReport) {
+        console.log('📊 CV Monitoring Report:', monitoringReport);
+        console.log(`- Total Warnings: ${monitoringReport.total_warnings}`);
+        console.log(`- Risk Level: ${monitoringReport.risk_level}`);
+        console.log(`- Frames Analyzed: ${monitoringReport.total_frames_analyzed}`);
+      }
+      
       await api.interviews.complete(interview.id);
       setStep('completed');
       cleanupMedia();
+      
+      // Redirect to feedback page after a short delay
+      setTimeout(() => {
+        navigate(`/feedback/${interview.id}`);
+      }, 2000);
       
     } catch (err) {
       console.error('Failed to complete interview:', err);
@@ -573,8 +672,33 @@ const CandidateInterview = () => {
                     label="Phone (Optional)"
                     value={candidateInfo.phone}
                     onChange={(e) => setCandidateInfo(prev => ({...prev, phone: e.target.value}))}
-                    sx={{ mb: 3 }}
+                    sx={{ mb: 2 }}
                   />
+                  
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Upload Your CV (PDF or Word) *
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      fullWidth
+                      sx={{ py: 1.5, textTransform: 'none' }}
+                    >
+                      {candidateInfo.cvFile ? candidateInfo.cvFile.name : 'Choose CV File'}
+                      <input
+                        type="file"
+                        hidden
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            setCandidateInfo(prev => ({...prev, cvFile: file}));
+                          }
+                        }}
+                      />
+                    </Button>
+                  </Box>
                 </Grid>
                 
                 <Grid item xs={12} md={6}>
@@ -586,13 +710,15 @@ const CandidateInterview = () => {
                     <video
                       ref={videoRef}
                       autoPlay
+                      playsInline
                       muted
                       style={{
                         width: '100%',
                         maxWidth: 300,
                         height: 200,
                         borderRadius: 8,
-                        backgroundColor: '#000'
+                        backgroundColor: '#000',
+                        objectFit: 'cover'
                       }}
                     />
                     
@@ -631,7 +757,7 @@ const CandidateInterview = () => {
                   variant="contained"
                   size="large"
                   onClick={startInterview}
-                  disabled={!candidateInfo.name || !candidateInfo.email || !videoEnabled || !audioEnabled || loading}
+                  disabled={!candidateInfo.name || !candidateInfo.email || !candidateInfo.cvFile || !videoEnabled || !audioEnabled || loading}
                   sx={{ px: 6, py: 1.5 }}
                 >
                   {loading ? <CircularProgress size={20} /> : 'Start Interview'}
@@ -704,6 +830,14 @@ const CandidateInterview = () => {
             </Grid>
           </Paper>
 
+          {/* CV Monitoring Alert */}
+          <MonitoringAlert
+            warning={recentWarning}
+            riskScore={monitoring.riskScore}
+            riskLevel={monitoring.riskLevel}
+            onDismiss={clearWarning}
+          />
+
           <Grid container spacing={3}>
             {/* Video feed */}
             <Grid item xs={12} md={4}>
@@ -713,17 +847,40 @@ const CandidateInterview = () => {
                     Video Feed
                   </Typography>
                   
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    muted
-                    style={{
-                      width: '100%',
-                      height: 250,
-                      borderRadius: 8,
-                      backgroundColor: '#000'
-                    }}
-                  />
+                  <Box sx={{ position: 'relative' }}>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      style={{
+                        width: '100%',
+                        height: 250,
+                        borderRadius: 8,
+                        backgroundColor: '#000',
+                        objectFit: 'cover'
+                      }}
+                    />
+                    
+                    {/* Monitoring Status Badge */}
+                    {monitoring.active && (
+                      <Chip
+                        label="Monitoring Active"
+                        color="primary"
+                        size="small"
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          animation: 'pulse 2s infinite',
+                          '@keyframes pulse': {
+                            '0%, 100%': { opacity: 1 },
+                            '50%': { opacity: 0.7 }
+                          }
+                        }}
+                      />
+                    )}
+                  </Box>
                   
                   <Box sx={{ mt: 2, textAlign: 'center' }}>
                     <Button

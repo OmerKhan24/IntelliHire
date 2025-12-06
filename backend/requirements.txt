@@ -1,0 +1,30 @@
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+Flask-JWT-Extended==4.5.2
+Flask-CORS==4.0.0
+PyMySQL==1.1.0
+cryptography==41.0.3
+python-dotenv==1.0.0
+python-docx==0.8.11
+google-generativeai==0.2.2
+gTTS==2.3.2
+SpeechRecognition==3.10.0
+azure-ai-inference==1.0.0b1
+Werkzeug==2.3.7
+
+# CV Monitoring Dependencies
+opencv-python==4.8.1.78
+mediapipe==0.10.8
+ultralytics==8.0.200
+numpy==1.24.3
+aiohttp==3.9.1
+
+# HR Chatbot Module Dependencies
+PyPDF2==3.0.1
+chromadb==0.4.22
+langchain==0.1.6
+langchain-community==0.0.20
+sentence-transformers==2.3.1
+tiktoken==0.5.2
+pydantic==2.6.0
+

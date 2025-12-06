@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Container, TextField, Button, Box, Typography, Paper, Link, alpha, InputAdornment, IconButton } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Container, TextField, Button, Box, Typography, Paper, Link, alpha, InputAdornment, IconButton, Alert } from '@mui/material';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import PersonIcon from '@mui/icons-material/Person';
 import LockIcon from '@mui/icons-material/Lock';
@@ -14,15 +14,54 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
+  const [sessionExpiredMsg, setSessionExpiredMsg] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+
+  useEffect(() => {
+    // Check if redirected due to session expiration
+    const params = new URLSearchParams(location.search);
+    const sessionExpired = params.get('session') === 'expired' || 
+                          sessionStorage.getItem('sessionExpired') === 'true';
+    
+    if (sessionExpired) {
+      setSessionExpiredMsg(true);
+      sessionStorage.removeItem('sessionExpired');
+      
+      // Auto-hide message after 8 seconds
+      setTimeout(() => setSessionExpiredMsg(false), 8000);
+    }
+  }, [location]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSessionExpiredMsg(false);
+    
     const result = await login(username, password);
     if (result.success) {
-      navigate('/');
+      // Check if there's a redirect path
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+      sessionStorage.removeItem('redirectAfterLogin');
+      
+      // If no redirect path, send user to appropriate dashboard based on role
+      if (!redirectPath) {
+        const userRole = result.user?.role;
+        if (userRole === 'admin') {
+          navigate('/admin');
+        } else if (userRole === 'interviewer') {
+          navigate('/dashboard');
+        } else if (userRole === 'employee') {
+          navigate('/employee-dashboard');
+        } else if (userRole === 'candidate') {
+          navigate('/my-interviews');
+        } else {
+          navigate('/');
+        }
+      } else {
+        navigate(redirectPath);
+      }
     } else {
       setError(result.error);
     }
@@ -108,6 +147,26 @@ const Login = () => {
               Sign in to continue to IntelliHire
             </Typography>
           </Box>
+
+          {/* Session Expired Alert */}
+          {sessionExpiredMsg && (
+            <Alert 
+              severity="warning" 
+              sx={{ 
+                mb: 3,
+                background: alpha('#ff9800', 0.2),
+                backdropFilter: 'blur(10px)',
+                border: `1px solid ${alpha('#ff9800', 0.4)}`,
+                color: '#fff',
+                '& .MuiAlert-icon': {
+                  color: '#ffd700'
+                }
+              }}
+              onClose={() => setSessionExpiredMsg(false)}
+            >
+              <strong>Session Expired</strong> - Your session has timed out. Please login again to continue.
+            </Alert>
+          )}
 
           {error && (
             <Typography

@@ -1,0 +1,20 @@
+# HR Chatbot Module - Additional Dependencies
+# Add these to your existing requirements.txt
+
+# Document Processing & Text Extraction
+PyPDF2==3.0.1
+python-docx==1.1.0
+
+# Vector Database & Embeddings
+chromadb==0.4.22
+langchain==0.1.6
+langchain-community==0.0.20
+sentence-transformers==2.3.1
+
+# Required by LangChain
+tiktoken==0.5.2
+pydantic==2.6.0
+
+# Already in your requirements (verify versions):
+# google-generativeai (for Gemini AI)
+# Flask and related packages

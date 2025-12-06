@@ -8,6 +8,12 @@ import Register from './pages/Register';
 import JobCreator from './pages/JobCreator';
 import InterviewDashboard from './pages/InterviewDashboard';
 import CandidateDashboard from './pages/CandidateDashboard';
+import CandidateInterview from './pages/CandidateInterview';
+import CandidateFeedback from './pages/CandidateFeedback';
+import InterviewReport from './pages/InterviewReport';
+import AdminDashboard from './pages/AdminDashboard';
+import HRAssistant from './pages/HRAssistant';
+import EmployeeDashboard from './pages/EmployeeDashboard';
 import './App.css';
 
 function App() {
@@ -18,6 +24,14 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/create-job" 
             element={
@@ -35,10 +49,42 @@ function App() {
             } 
           />
           <Route 
+            path="/employee-dashboard" 
+            element={
+              <ProtectedRoute requiredRole="employee">
+                <EmployeeDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hr-assistant" 
+            element={
+              <ProtectedRoute requiredRole={["interviewer", "employee"]}>
+                <HRAssistant />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/my-interviews" 
             element={
               <ProtectedRoute requiredRole="candidate">
                 <CandidateDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/interview/:jobId" 
+            element={<CandidateInterview />} 
+          />
+          <Route 
+            path="/feedback/:interviewId" 
+            element={<CandidateFeedback />} 
+          />
+          <Route 
+            path="/report/:jobId" 
+            element={
+              <ProtectedRoute requiredRole="interviewer">
+                <InterviewReport />
               </ProtectedRoute>
             } 
           />
