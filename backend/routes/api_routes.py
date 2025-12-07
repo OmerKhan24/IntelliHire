@@ -37,14 +37,13 @@ def init_services(config):
     except Exception as e:
         logger.warning(f"⚠️ Google TTS service not available: {e}")
     
-    # GitHub Copilot temporarily disabled due to rate limits
-    # try:
-    #     github_copilot_service = GitHubCopilotService()
-    #     logger.info("✅ GitHub Copilot AI service initialized successfully")
-    # except Exception as e:
-    #     logger.warning(f"⚠️ GitHub Copilot service not available: {e}")
-    
-    logger.warning("⚠️ GitHub Copilot service disabled - using fallback questions and scoring")
+    # Re-enable GitHub Copilot for CV monitoring and scoring
+    try:
+        github_copilot_service = GitHubCopilotService()
+        logger.info("✅ GitHub Copilot AI service initialized successfully")
+    except Exception as e:
+        logger.warning(f"⚠️ GitHub Copilot service not available: {e}")
+        logger.info("📝 Will use fallback questions and scoring if needed")
     
     # CV Monitoring service is auto-initialized on import
     if cv_monitoring_service.enabled:

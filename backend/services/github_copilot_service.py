@@ -32,12 +32,12 @@ class GitHubCopilotService:
         if token:
             print(f"🔑 Token (first 15 chars): {token[:15]}...")
             self.token = token
-            self.enabled = True
-            print(f"✅ GitHub Copilot service enabled with model: {self.model}")
+            self.enabled = True  # ✅ RE-ENABLED for CV monitoring and scoring
+            print(f"✅ GitHub Copilot service ENABLED with model: {self.model}")
         else:
             self.token = None
-            self.enabled = False
-            print("❌ GITHUB_TOKEN not found - running in fallback mode")
+            self.enabled = True  # ✅ RE-ENABLED - will use fallback scoring if no token
+            print("⚠️  GITHUB_TOKEN not found - using fallback scoring mode")
     
     async def _call_api(self, messages, retry_count=0):
         """Make async HTTP request to GitHub Models API with retry logic"""
