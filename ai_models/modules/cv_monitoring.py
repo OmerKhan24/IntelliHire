@@ -14,8 +14,14 @@ from enum import Enum
 try:
     import mediapipe as mp
     from ultralytics import YOLO
+    MEDIAPIPE_AVAILABLE = True
+    YOLO_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Some imports failed - {e}. Module will work in proper environment.")
+    mp = None
+    YOLO = None
+    MEDIAPIPE_AVAILABLE = False
+    YOLO_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -69,18 +75,34 @@ class CVMonitoringSystem:
     def initialize_models(self) -> bool:
         """Initialize all CV models"""
         try:
-            # Initialize MediaPipe
-            mp_module = mp
-            self.mp_face_detection = mp_module.solutions.face_detection
-            self.mp_face_mesh = mp_module.solutions.face_mesh
-            self.mp_hands = mp_module.solutions.hands
+            # Check if dependencies are available
+            if not MEDIAPIPE_AVAILABLE:
+                logger.warning("MediaPipe not available - face detection disabled")
+                print("⚠️ MediaPipe not installed - face detection features disabled")
             
-            self.face_detector = self.mp_face_detection.FaceDetection(
-                model_selection=1, min_detection_confidence=0.5
-            )
+            if not YOLO_AVAILABLE:
+                logger.warning("YOLO not available - object detection disabled")
+                print("⚠️ YOLO not installed - object detection features disabled")
             
-            # Initialize YOLO for object detection
-            self.yolo_model = YOLO('yolov8n.pt')  # Using nano version for speed
+            if not MEDIAPIPE_AVAILABLE and not YOLO_AVAILABLE:
+                logger.error("No CV models available")
+                return False
+            
+            # Initialize MediaPipe if available
+            if MEDIAPIPE_AVAILABLE and mp is not None:
+                self.mp_face_detection = mp.solutions.face_detection
+                self.mp_face_mesh = mp.solutions.face_mesh
+                self.mp_hands = mp.solutions.hands
+                
+                self.face_detector = self.mp_face_detection.FaceDetection(
+                    model_selection=1, min_detection_confidence=0.5
+                )
+                logger.info("✅ MediaPipe models initialized")
+            
+            # Initialize YOLO if available
+            if YOLO_AVAILABLE and YOLO is not None:
+                self.yolo_model = YOLO('yolov8n.pt')  # Using nano version for speed
+                logger.info("✅ YOLO model initialized")
             
             logger.info("CV models initialized successfully")
             return True
