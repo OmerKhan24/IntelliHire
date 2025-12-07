@@ -2,6 +2,11 @@
 -- Converted from MySQL (intellihire_dev)
 -- Compatible with Render PostgreSQL
 
+-- NOTE: On Render, the database is already created for you
+-- If running locally, create database first:
+-- CREATE DATABASE intellihire_dev;
+-- Then connect: \c intellihire_dev
+
 -- Set timezone
 SET timezone = 'UTC';
 

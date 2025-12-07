@@ -30,6 +30,19 @@ This is your MySQL database converted to PostgreSQL format, ready for Render dep
 
 ## How to Import to Render:
 
+### Important: Database Name on Render
+
+**On Render:** The database is automatically created with a name like `intellihire` (you choose this during setup). You don't need to create it - Render does it for you.
+
+**Locally (Optional):** If testing PostgreSQL locally:
+```bash
+# Create database
+psql -U postgres
+CREATE DATABASE intellihire_dev;
+\c intellihire_dev
+\i /path/to/intellihire_postgresql.sql
+```
+
 ### Method 1: Render Web Shell (Easiest)
 
 1. Deploy your backend to Render first
