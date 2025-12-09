@@ -40,9 +40,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (username, email, password, role) => {
+  const register = async (username, email, password, role, full_name, phone) => {
     try {
-      await api.auth.register({ username, email, password, role });
+      await api.auth.register({ username, email, password, role, full_name, phone });
       // Auto-login after registration
       return await login(username, password);
     } catch (err) {

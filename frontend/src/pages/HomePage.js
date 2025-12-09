@@ -36,16 +36,30 @@ import LinkIcon from '@mui/icons-material/Link';
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { user, logout, isInterviewer, isCandidate } = useAuth();
+  const { user, logout, isInterviewer, isCandidate, loading } = useAuth();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
+    // Only redirect if not loading and user exists
+    if (!loading && user) {
+      console.log('Redirecting user:', user.role);
+      if (user.role === 'admin') {
+        navigate('/admin');
+      } else if (user.role === 'interviewer') {
+        navigate('/dashboard');
+      } else if (user.role === 'employee') {
+        navigate('/employee-dashboard');
+      } else if (user.role === 'candidate') {
+        navigate('/my-interviews');
+      }
+    }
+    
     const handleScroll = () => {
       setScrolled(window.scrollY > 50);
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [user, loading, navigate]);
 
   const features = [
     {
@@ -89,6 +103,25 @@ const HomePage = () => {
     await logout();
     navigate('/login');
   };
+
+  // Show loading while auth is initializing
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        }}
+      >
+        <Typography variant="h4" sx={{ color: '#fff', fontWeight: 700 }}>
+          Loading...
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ 

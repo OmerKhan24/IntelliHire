@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Disable ChromaDB telemetry to avoid annoying errors
+os.environ['ANONYMIZED_TELEMETRY'] = 'False'
+
 def create_app(config_name='development'):
     """
     Application factory pattern for Flask app creation
@@ -56,10 +59,12 @@ def create_app(config_name='development'):
     
     # Enhanced CORS configuration - Allow access from network devices
     CORS(app, 
-         origins=['http://localhost:3000', 'http://192.168.100.80:3000', 'http://127.0.0.1:3000'],
-         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-         allow_headers=['Content-Type', 'Authorization'],
-         supports_credentials=True)
+         origins=['http://localhost:3000', 'http://192.168.100.80:3000', 'http://127.0.0.1:3000', 'http://192.168.100.80:5000'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
+         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+         expose_headers=['Content-Type', 'Authorization'],
+         supports_credentials=True,
+         max_age=3600)  # Cache preflight requests for 1 hour
     
     # Create upload directory
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

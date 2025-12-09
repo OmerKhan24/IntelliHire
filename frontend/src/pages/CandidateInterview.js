@@ -30,6 +30,8 @@ import {
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { useCVMonitoring } from '../hooks/useCVMonitoring';
+import MonitoringAlert from '../components/MonitoringAlert';
 
 const CandidateInterview = () => {
   const { jobId } = useParams();
@@ -46,7 +48,8 @@ const CandidateInterview = () => {
   const [candidateInfo, setCandidateInfo] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    cvFile: null
   });
   
   // Interview state
@@ -77,6 +80,16 @@ const CandidateInterview = () => {
   const [warnings, setWarnings] = useState([]);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [showWarning, setShowWarning] = useState(false);
+
+  // CV Monitoring integration
+  const {
+    monitoring,
+    recentWarning,
+    startMonitoring,
+    stopMonitoring,
+    getWarningStats,
+    clearWarning
+  } = useCVMonitoring(interview?.id, videoRef, true); // Always enabled when interview exists
 
   useEffect(() => {
     loadJobDetails();
@@ -116,10 +129,60 @@ const CandidateInterview = () => {
     }
   }, [currentQuestionIndex, step, questions]);
 
+  // Ensure video stream is connected when interview starts
+  useEffect(() => {
+    if (step === 'interview' && videoRef.current && streamRef.current) {
+      console.log('🎥 Reconnecting video stream for interview...');
+      videoRef.current.srcObject = streamRef.current;
+      
+      // Ensure video plays
+      videoRef.current.play().catch(err => {
+        console.error('Failed to play video:', err);
+      });
+      
+      console.log('✅ Video stream reconnected for interview');
+      
+      // Start CV monitoring AFTER video is ready
+      if (interview?.id && !monitoring.active) {
+        console.log('🎥 Video ready, starting CV monitoring...');
+        startMonitoring(interview.id).then(() => {
+          console.log('✅ CV monitoring started after video setup');
+        }).catch(err => {
+          console.warn('⚠️ CV monitoring failed to start:', err);
+        });
+      }
+    }
+  }, [step, interview, monitoring.active, startMonitoring]);
+
+  // Ensure video persists when question changes
+  useEffect(() => {
+    if (step === 'interview' && videoRef.current && streamRef.current) {
+      // Reassign srcObject to maintain video across questions
+      if (!videoRef.current.srcObject || videoRef.current.srcObject !== streamRef.current) {
+        console.log(`🎥 Reassigning video for question ${currentQuestionIndex + 1}...`);
+        videoRef.current.srcObject = streamRef.current;
+        videoRef.current.play().catch(err => {
+          console.error('Failed to play video:', err);
+        });
+      }
+    }
+  }, [currentQuestionIndex, step]);
+
   const loadJobDetails = async () => {
     try {
       const response = await api.jobs.get(jobId);
       setJob(response.data.job);
+      
+      // Track interview access (stores in localStorage for candidate session)
+      const candidateEmail = localStorage.getItem('candidate_email');
+      if (candidateEmail) {
+        try {
+          await api.interviews.trackAccess(jobId, { candidate_email: candidateEmail });
+          console.log('📍 Interview access tracked');
+        } catch (err) {
+          console.warn('Failed to track interview access:', err);
+        }
+      }
     } catch (err) {
       setError('Failed to load job details: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -321,28 +384,69 @@ const CandidateInterview = () => {
   };
 
   const startInterview = async () => {
-    if (!candidateInfo.name || !candidateInfo.email) {
-      setError('Please provide your name and email to continue');
+    if (!candidateInfo.name || !candidateInfo.email || !candidateInfo.cvFile) {
+      setError('Please provide your name, email, and CV file to continue');
       return;
     }
 
     try {
       setLoading(true);
       
+      // Store candidate email in localStorage for session tracking
+      localStorage.setItem('candidate_email', candidateInfo.email);
+      
+      // Track interview access first
+      await api.interviews.trackAccess(jobId, {
+        candidate_name: candidateInfo.name,
+        candidate_email: candidateInfo.email,
+        candidate_phone: candidateInfo.phone
+      });
+      
       // Start interview
-      const interviewResponse = await api.interviews.start(jobId, candidateInfo);
+      const interviewResponse = await api.interviews.start({
+        job_id: jobId,
+        candidate_name: candidateInfo.name,
+        candidate_email: candidateInfo.email,
+        candidate_phone: candidateInfo.phone
+      });
       setInterview(interviewResponse.data.interview);
       
-      // Get questions
+      // Upload CV with interview_id
+      const formData = new FormData();
+      formData.append('file', candidateInfo.cvFile);
+      formData.append('interview_id', interviewResponse.data.interview.id);
+      
+      console.log('📤 Uploading CV with interview_id:', interviewResponse.data.interview.id);
+      console.log('📄 CV File:', candidateInfo.cvFile.name, candidateInfo.cvFile.size, 'bytes');
+      
+      try {
+        await api.candidate.uploadCV(formData);
+        console.log('✅ CV uploaded successfully for RAG processing');
+      } catch (cvError) {
+        console.error('⚠️ CV upload failed:', cvError);
+        // Continue anyway - questions will be generic without RAG
+      }
+      
+      // Get questions (will use CV for RAG if uploaded)
       const questionsResponse = await api.interviews.getQuestions(interviewResponse.data.interview.id);
+      console.log('Questions response:', questionsResponse.data);
+      console.log('Questions array:', questionsResponse.data.questions);
+      
+      if (!questionsResponse.data.questions || questionsResponse.data.questions.length === 0) {
+        throw new Error('No questions returned from API');
+      }
+      
       setQuestions(questionsResponse.data.questions);
       
       // Set timer
       setTimeRemaining(job.duration_minutes * 60);
-      setStep('interview');
       
       // Start recording
       startRecording();
+      
+      // Change to interview step (this will trigger video reconnection and CV monitoring)
+      // CV monitoring will start automatically after video is ready (see useEffect above)
+      setStep('interview');
       
     } catch (err) {
       setError('Failed to start interview: ' + (err.response?.data?.error || err.message));
@@ -451,9 +555,25 @@ const CandidateInterview = () => {
         mediaRecorderRef.current.stop();
       }
       
+      // Stop CV monitoring and get report
+      console.log('🏁 Stopping CV monitoring...');
+      const monitoringReport = await stopMonitoring();
+      
+      if (monitoringReport) {
+        console.log('📊 CV Monitoring Report:', monitoringReport);
+        console.log(`- Total Warnings: ${monitoringReport.total_warnings}`);
+        console.log(`- Risk Level: ${monitoringReport.risk_level}`);
+        console.log(`- Frames Analyzed: ${monitoringReport.total_frames_analyzed}`);
+      }
+      
       await api.interviews.complete(interview.id);
       setStep('completed');
       cleanupMedia();
+      
+      // Redirect to feedback page after a short delay
+      setTimeout(() => {
+        navigate(`/feedback/${interview.id}`);
+      }, 2000);
       
     } catch (err) {
       console.error('Failed to complete interview:', err);
@@ -488,57 +608,166 @@ const CandidateInterview = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="md">
-        <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-          <CircularProgress />
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #0A192F 0%, #1E3A5F 50%, #0A192F 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress 
+            size={60} 
+            sx={{ 
+              color: '#0891B2',
+              mb: 2
+            }} 
+          />
+          <Typography sx={{ color: '#fff', fontSize: '1.1rem' }}>
+            Loading interview...
+          </Typography>
         </Box>
-      </Container>
+      </Box>
     );
   }
 
   if (error && !job) {
     return (
-      <Container maxWidth="md">
-        <Box sx={{ py: 4 }}>
-          <Alert severity="error">{error}</Alert>
-        </Box>
-      </Container>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #0A192F 0%, #1E3A5F 50%, #0A192F 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 3
+        }}
+      >
+        <Card sx={{
+          maxWidth: 500,
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.1) 100%)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          boxShadow: '0 8px 32px rgba(239, 68, 68, 0.2)'
+        }}>
+          <CardContent sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h5" sx={{ color: '#EF4444', fontWeight: 700, mb: 2 }}>
+              ⚠️ Error Loading Interview
+            </Typography>
+            <Typography sx={{ color: 'rgba(255,255,255,0.9)' }}>
+              {error}
+            </Typography>
+          </CardContent>
+        </Card>
+      </Box>
     );
   }
 
   // Setup step
   if (step === 'setup') {
     return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #0A192F 0%, #1E3A5F 50%, #0A192F 100%)',
+          position: 'relative',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'radial-gradient(circle at 20% 50%, rgba(8, 145, 178, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(13, 148, 136, 0.1) 0%, transparent 50%)',
+            pointerEvents: 'none'
+          }
+        }}
+      >
       <Container maxWidth="md">
-        <Box sx={{ py: 4 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="h4" gutterBottom align="center">
-                Welcome to Your AI Interview
+        <Box sx={{ py: 4, position: 'relative', zIndex: 1 }}>
+          <Card sx={{
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.1) 100%)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+          }}>
+            <CardContent sx={{ p: 4 }}>
+              <Typography 
+                variant="h3" 
+                gutterBottom 
+                align="center"
+                sx={{
+                  color: '#fff',
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  mb: 2
+                }}
+              >
+                🎯 Welcome to Your AI Interview
               </Typography>
               
               {job && (
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" gutterBottom>
+                <Box 
+                  sx={{ 
+                    mb: 4,
+                    p: 3,
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: 2,
+                    border: '1px solid rgba(255,255,255,0.1)'
+                  }}
+                >
+                  <Typography 
+                    variant="h5" 
+                    gutterBottom
+                    sx={{ 
+                      color: '#fff',
+                      fontWeight: 700
+                    }}
+                  >
                     Position: {job.title}
                   </Typography>
-                  <Typography color="text.secondary" paragraph>
+                  <Typography sx={{ color: 'rgba(255,255,255,0.8)', mb: 2 }}>
                     {job.description}
                   </Typography>
-                  <Chip 
-                    icon={<TimerIcon />} 
-                    label={`Duration: ${job.duration_minutes} minutes`}
-                    sx={{ mr: 2 }}
-                  />
-                  <Chip 
-                    label={`${questions.length || 'Multiple'} Questions`}
-                    color="primary"
-                  />
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Chip 
+                      icon={<TimerIcon />} 
+                      label={`Duration: ${job.duration_minutes} minutes`}
+                      sx={{
+                        background: 'linear-gradient(135deg, #0891B2 0%, #06B6D4 100%)',
+                        color: '#fff',
+                        fontWeight: 600,
+                        border: '1px solid rgba(255,255,255,0.2)'
+                      }}
+                    />
+                    <Chip 
+                      label={`${questions.length || 'Multiple'} Questions`}
+                      sx={{
+                        background: 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
+                        color: '#fff',
+                        fontWeight: 600,
+                        border: '1px solid rgba(255,255,255,0.2)'
+                      }}
+                    />
+                  </Box>
                 </Box>
               )}
 
               {error && (
-                <Alert severity="error" sx={{ mb: 3 }}>
+                <Alert 
+                  severity="error" 
+                  sx={{ 
+                    mb: 3,
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#fff'
+                  }}
+                >
                   {error}
                 </Alert>
               )}
@@ -573,8 +802,33 @@ const CandidateInterview = () => {
                     label="Phone (Optional)"
                     value={candidateInfo.phone}
                     onChange={(e) => setCandidateInfo(prev => ({...prev, phone: e.target.value}))}
-                    sx={{ mb: 3 }}
+                    sx={{ mb: 2 }}
                   />
+                  
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Upload Your CV (PDF or Word) *
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      fullWidth
+                      sx={{ py: 1.5, textTransform: 'none' }}
+                    >
+                      {candidateInfo.cvFile ? candidateInfo.cvFile.name : 'Choose CV File'}
+                      <input
+                        type="file"
+                        hidden
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            setCandidateInfo(prev => ({...prev, cvFile: file}));
+                          }
+                        }}
+                      />
+                    </Button>
+                  </Box>
                 </Grid>
                 
                 <Grid item xs={12} md={6}>
@@ -586,13 +840,15 @@ const CandidateInterview = () => {
                     <video
                       ref={videoRef}
                       autoPlay
+                      playsInline
                       muted
                       style={{
                         width: '100%',
                         maxWidth: 300,
                         height: 200,
                         borderRadius: 8,
-                        backgroundColor: '#000'
+                        backgroundColor: '#000',
+                        objectFit: 'cover'
                       }}
                     />
                     
@@ -631,7 +887,7 @@ const CandidateInterview = () => {
                   variant="contained"
                   size="large"
                   onClick={startInterview}
-                  disabled={!candidateInfo.name || !candidateInfo.email || !videoEnabled || !audioEnabled || loading}
+                  disabled={!candidateInfo.name || !candidateInfo.email || !candidateInfo.cvFile || !videoEnabled || !audioEnabled || loading}
                   sx={{ px: 6, py: 1.5 }}
                 >
                   {loading ? <CircularProgress size={20} /> : 'Start Interview'}
@@ -641,6 +897,7 @@ const CandidateInterview = () => {
           </Card>
         </Box>
       </Container>
+      </Box>
     );
   }
 
@@ -704,6 +961,14 @@ const CandidateInterview = () => {
             </Grid>
           </Paper>
 
+          {/* CV Monitoring Alert */}
+          <MonitoringAlert
+            warning={recentWarning}
+            riskScore={monitoring.riskScore}
+            riskLevel={monitoring.riskLevel}
+            onDismiss={clearWarning}
+          />
+
           <Grid container spacing={3}>
             {/* Video feed */}
             <Grid item xs={12} md={4}>
@@ -713,17 +978,40 @@ const CandidateInterview = () => {
                     Video Feed
                   </Typography>
                   
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    muted
-                    style={{
-                      width: '100%',
-                      height: 250,
-                      borderRadius: 8,
-                      backgroundColor: '#000'
-                    }}
-                  />
+                  <Box sx={{ position: 'relative' }}>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      style={{
+                        width: '100%',
+                        height: 250,
+                        borderRadius: 8,
+                        backgroundColor: '#000',
+                        objectFit: 'cover'
+                      }}
+                    />
+                    
+                    {/* Monitoring Status Badge */}
+                    {monitoring.active && (
+                      <Chip
+                        label="Monitoring Active"
+                        color="primary"
+                        size="small"
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          animation: 'pulse 2s infinite',
+                          '@keyframes pulse': {
+                            '0%, 100%': { opacity: 1 },
+                            '50%': { opacity: 0.7 }
+                          }
+                        }}
+                      />
+                    )}
+                  </Box>
                   
                   <Box sx={{ mt: 2, textAlign: 'center' }}>
                     <Button

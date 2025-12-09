@@ -52,13 +52,15 @@ class CVMonitoringSystem:
         self.multiple_face_count = 0
         self.phone_detection_count = 0
         self.suspicious_movement_count = 0
+        self.gaze_deviation_count = 0  # Track consecutive gaze deviations
         
         # Configuration
         self.config = {
-            "face_absence_threshold": 30,  # frames
-            "multiple_face_threshold": 10,  # frames
-            "phone_detection_threshold": 5,  # frames
-            "gaze_deviation_threshold": 0.3,  # normalized
+            "face_absence_threshold": 20,  # frames
+            "multiple_face_threshold": 5,  # frames
+            "phone_detection_threshold": 3,  # frames
+            "gaze_deviation_threshold": 0.15,  # normalized (lowered for better sensitivity)
+            "gaze_consecutive_frames": 6,  # frames before triggering alert
             "movement_threshold": 50,  # pixels
             "confidence_threshold": 0.5
         }
@@ -69,24 +71,34 @@ class CVMonitoringSystem:
     def initialize_models(self) -> bool:
         """Initialize all CV models"""
         try:
-            # Initialize MediaPipe
+            # Initialize MediaPipe with error handling
             mp_module = mp
             self.mp_face_detection = mp_module.solutions.face_detection
             self.mp_face_mesh = mp_module.solutions.face_mesh
             self.mp_hands = mp_module.solutions.hands
             
+            # Initialize face detector with static_image_mode to avoid protobuf issues
             self.face_detector = self.mp_face_detection.FaceDetection(
-                model_selection=1, min_detection_confidence=0.5
+                model_selection=1, 
+                min_detection_confidence=0.5
+            )
+            
+            # Initialize face mesh for gaze tracking
+            self.face_mesh = self.mp_face_mesh.FaceMesh(
+                max_num_faces=2,
+                refine_landmarks=True,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5
             )
             
             # Initialize YOLO for object detection
             self.yolo_model = YOLO('yolov8n.pt')  # Using nano version for speed
             
-            logger.info("CV models initialized successfully")
+            logger.info("✅ CV models initialized successfully")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to initialize CV models: {e}")
+            logger.error(f"❌ Failed to initialize CV models: {e}")
             return False
     
     def analyze_frame(self, frame: np.ndarray) -> List[DetectionResult]:
@@ -146,8 +158,14 @@ class CVMonitoringSystem:
             if not self.face_detector:
                 return results
             
+            # Create a copy to avoid memory issues
+            frame_copy = rgb_frame.copy()
+            frame_copy.flags.writeable = False
+            
             # Detect faces
-            face_results = self.face_detector.process(rgb_frame)
+            face_results = self.face_detector.process(frame_copy)
+            
+            frame_copy.flags.writeable = True
             
             if not face_results.detections:
                 # No face detected
@@ -238,6 +256,9 @@ class CVMonitoringSystem:
             # Run YOLO detection
             detections = self.yolo_model(frame, verbose=False)
             
+            # Count persons detected (to identify multiple people)
+            person_count = 0
+            
             # Analyze detected objects
             for detection in detections:
                 boxes = detection.boxes
@@ -249,8 +270,12 @@ class CVMonitoringSystem:
                         if confidence > self.config["confidence_threshold"]:
                             class_name = self.yolo_model.names[class_id]
                             
-                            # Check for suspicious objects
-                            if class_name in ['cell phone', 'laptop', 'book', 'person']:
+                            # Count persons
+                            if class_name == 'person':
+                                person_count += 1
+                            
+                            # Check for suspicious objects (exclude person, handle separately)
+                            if class_name in ['cell phone', 'laptop', 'book']:
                                 alert_level = self._get_object_alert_level(class_name, confidence)
                                 
                                 if class_name == 'cell phone':
@@ -269,6 +294,19 @@ class CVMonitoringSystem:
                                     }
                                 ))
             
+            # Only flag if multiple persons detected (more than the candidate)
+            if person_count > 1:
+                results.append(DetectionResult(
+                    timestamp=timestamp,
+                    alert_level=AlertLevel.CRITICAL,
+                    detection_type="multiple_persons_detected",
+                    confidence=0.9,
+                    details={
+                        "message": f"Multiple persons in frame: {person_count}",
+                        "person_count": person_count
+                    }
+                ))
+            
             return results
             
         except Exception as e:
@@ -280,36 +318,52 @@ class CVMonitoringSystem:
         results = []
         
         try:
-            if not self.mp_face_mesh:
+            # Check if face mesh is initialized
+            if not hasattr(self, 'face_mesh') or self.face_mesh is None:
+                logger.warning("Face mesh not initialized, skipping gaze analysis")
                 return results
             
-            with self.mp_face_mesh.FaceMesh(
-                max_num_faces=1,
-                refine_landmarks=True,
-                min_detection_confidence=0.5,
-                min_tracking_confidence=0.5
-            ) as face_mesh:
-                
-                mesh_results = face_mesh.process(rgb_frame)
-                
-                if mesh_results.multi_face_landmarks:
-                    for face_landmarks in mesh_results.multi_face_landmarks:
-                        # Calculate gaze direction
-                        gaze_info = self._calculate_gaze_direction(face_landmarks, rgb_frame.shape)
+            # Create a copy to avoid memory issues
+            frame_copy = rgb_frame.copy()
+            frame_copy.flags.writeable = False
+            
+            mesh_results = self.face_mesh.process(frame_copy)
+            
+            frame_copy.flags.writeable = True
+            
+            if mesh_results.multi_face_landmarks:
+                for face_landmarks in mesh_results.multi_face_landmarks:
+                    # Calculate gaze direction with improved algorithm
+                    gaze_info = self._calculate_gaze_direction(face_landmarks, rgb_frame.shape)
+                    
+                    # Check if gaze is deviated
+                    if gaze_info["deviation"] > self.config["gaze_deviation_threshold"]:
+                        self.gaze_deviation_count += 1
                         
-                        if gaze_info["deviation"] > self.config["gaze_deviation_threshold"]:
+                        # Only trigger alert after consecutive deviations
+                        if self.gaze_deviation_count >= self.config["gaze_consecutive_frames"]:
+                            # Determine alert level based on severity
+                            alert_level = AlertLevel.HIGH if gaze_info["deviation"] > 0.3 else AlertLevel.MEDIUM
+                            
                             results.append(DetectionResult(
                                 timestamp=timestamp,
-                                alert_level=AlertLevel.MEDIUM,
+                                alert_level=alert_level,
                                 detection_type="gaze_deviation",
                                 confidence=gaze_info["confidence"],
                                 details={
-                                    "message": "Looking away from camera",
+                                    "message": f"Looking {gaze_info['direction']} - not at screen",
                                     "gaze_direction": gaze_info["direction"],
-                                    "deviation": gaze_info["deviation"],
-                                    "threshold": self.config["gaze_deviation_threshold"]
+                                    "deviation": round(gaze_info["deviation"], 3),
+                                    "head_pose": gaze_info.get("head_pose", "unknown"),
+                                    "threshold": self.config["gaze_deviation_threshold"],
+                                    "count": self.gaze_deviation_count
                                 }
                             ))
+                            # Reset after alert
+                            self.gaze_deviation_count = max(0, self.gaze_deviation_count - 5)
+                    else:
+                        # Reset count if gaze returns to normal
+                        self.gaze_deviation_count = max(0, self.gaze_deviation_count - 1)
             
             return results
             
@@ -372,55 +426,106 @@ class CVMonitoringSystem:
             return AlertLevel.HIGH if confidence > 0.7 else AlertLevel.MEDIUM
         elif object_class == 'book':
             return AlertLevel.MEDIUM
-        elif object_class == 'person':
-            return AlertLevel.HIGH if confidence > 0.8 else AlertLevel.MEDIUM
         else:
             return AlertLevel.LOW
     
     def _calculate_gaze_direction(self, face_landmarks, frame_shape) -> Dict[str, Any]:
-        """Calculate gaze direction from face landmarks"""
+        """Calculate gaze direction from face landmarks with improved accuracy"""
         try:
-            # Get eye landmarks (simplified calculation)
-            left_eye_indices = [33, 133, 157, 158, 159, 160, 161, 163]
-            right_eye_indices = [362, 398, 384, 385, 386, 387, 388, 466]
-            
             h, w = frame_shape[:2]
             
-            # Calculate eye centers
-            left_eye_center = np.mean([
-                [face_landmarks.landmark[i].x * w, face_landmarks.landmark[i].y * h]
-                for i in left_eye_indices
+            # Key landmarks for gaze estimation
+            # Left eye: iris center and corners
+            left_iris = [468, 469, 470, 471, 472]  # iris landmarks
+            left_eye_corners = [33, 133]  # inner and outer corners
+            
+            # Right eye: iris center and corners  
+            right_iris = [473, 474, 475, 476, 477]  # iris landmarks
+            right_eye_corners = [362, 263]  # inner and outer corners
+            
+            # Calculate iris positions relative to eye corners
+            left_iris_center = np.mean([
+                [face_landmarks.landmark[i].x, face_landmarks.landmark[i].y]
+                for i in left_iris
             ], axis=0)
             
-            right_eye_center = np.mean([
-                [face_landmarks.landmark[i].x * w, face_landmarks.landmark[i].y * h]
-                for i in right_eye_indices
+            left_eye_left = np.array([face_landmarks.landmark[33].x, face_landmarks.landmark[33].y])
+            left_eye_right = np.array([face_landmarks.landmark[133].x, face_landmarks.landmark[133].y])
+            left_eye_width = np.linalg.norm(left_eye_right - left_eye_left)
+            
+            right_iris_center = np.mean([
+                [face_landmarks.landmark[i].x, face_landmarks.landmark[i].y]
+                for i in right_iris
             ], axis=0)
             
-            # Calculate gaze vector (simplified)
-            eye_center = (left_eye_center + right_eye_center) / 2
-            face_center = np.array([w/2, h/2])
+            right_eye_left = np.array([face_landmarks.landmark[362].x, face_landmarks.landmark[362].y])
+            right_eye_right = np.array([face_landmarks.landmark[263].x, face_landmarks.landmark[263].y])
+            right_eye_width = np.linalg.norm(right_eye_right - right_eye_left)
             
-            gaze_vector = eye_center - face_center
-            deviation = np.linalg.norm(gaze_vector) / (w/2)  # Normalize
+            # Calculate iris position ratio (0.5 = center, <0.5 = left, >0.5 = right)
+            left_ratio = (left_iris_center[0] - left_eye_left[0]) / left_eye_width if left_eye_width > 0 else 0.5
+            right_ratio = (right_iris_center[0] - right_eye_left[0]) / right_eye_width if right_eye_width > 0 else 0.5
             
-            # Determine direction
+            # Average ratio
+            horizontal_ratio = (left_ratio + right_ratio) / 2
+            
+            # Vertical gaze estimation
+            left_eye_top = np.array([face_landmarks.landmark[159].x, face_landmarks.landmark[159].y])
+            left_eye_bottom = np.array([face_landmarks.landmark[145].x, face_landmarks.landmark[145].y])
+            left_eye_height = np.linalg.norm(left_eye_bottom - left_eye_top)
+            
+            vertical_ratio = (left_iris_center[1] - left_eye_top[1]) / left_eye_height if left_eye_height > 0 else 0.5
+            
+            # Head pose estimation using nose and face landmarks
+            nose_tip = np.array([face_landmarks.landmark[1].x, face_landmarks.landmark[1].y])
+            nose_bridge = np.array([face_landmarks.landmark[168].x, face_landmarks.landmark[168].y])
+            left_face = np.array([face_landmarks.landmark[234].x, face_landmarks.landmark[234].y])
+            right_face = np.array([face_landmarks.landmark[454].x, face_landmarks.landmark[454].y])
+            
+            # Calculate face center
+            face_center_x = (left_face[0] + right_face[0]) / 2
+            head_turn = (nose_tip[0] - face_center_x) * 2  # amplify for sensitivity
+            
+            # Combine eye gaze and head pose
+            horizontal_deviation = abs(horizontal_ratio - 0.5) + abs(head_turn)
+            vertical_deviation = abs(vertical_ratio - 0.5)
+            
+            total_deviation = np.sqrt(horizontal_deviation**2 + vertical_deviation**2)
+            
+            # Determine direction with better thresholds
             direction = "center"
-            if abs(gaze_vector[0]) > abs(gaze_vector[1]):
-                direction = "right" if gaze_vector[0] > 0 else "left"
-            else:
-                direction = "down" if gaze_vector[1] > 0 else "up"
+            head_pose = "straight"
+            
+            # Horizontal direction
+            if horizontal_ratio < 0.35 or head_turn < -0.1:
+                direction = "left"
+                head_pose = "turned left" if head_turn < -0.1 else "eyes left"
+            elif horizontal_ratio > 0.65 or head_turn > 0.1:
+                direction = "right"
+                head_pose = "turned right" if head_turn > 0.1 else "eyes right"
+            
+            # Vertical direction (can override horizontal)
+            if vertical_ratio < 0.35:
+                direction = "up" if direction == "center" else f"{direction}-up"
+            elif vertical_ratio > 0.65:
+                direction = "down" if direction == "center" else f"{direction}-down"
+            
+            # Calculate confidence based on eye openness and detection quality
+            confidence = min(0.95, 0.7 + (left_eye_height + right_eye_width) * 0.5)
             
             return {
                 "direction": direction,
-                "deviation": deviation,
-                "confidence": 0.7,  # Simplified confidence
-                "vector": gaze_vector.tolist()
+                "deviation": total_deviation,
+                "confidence": confidence,
+                "horizontal_ratio": round(horizontal_ratio, 3),
+                "vertical_ratio": round(vertical_ratio, 3),
+                "head_pose": head_pose,
+                "head_turn": round(head_turn, 3)
             }
             
         except Exception as e:
             logger.error(f"Gaze calculation failed: {e}")
-            return {"direction": "unknown", "deviation": 0, "confidence": 0, "vector": [0, 0]}
+            return {"direction": "unknown", "deviation": 0, "confidence": 0, "head_pose": "unknown"}
     
     def get_monitoring_summary(self, time_window: int = 300) -> Dict[str, Any]:
         """

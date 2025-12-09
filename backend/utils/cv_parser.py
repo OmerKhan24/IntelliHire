@@ -65,6 +65,7 @@ def _extract_from_pdf(file_path: str) -> str:
 def _extract_from_docx(file_path: str) -> str:
     """Extract text from DOCX file using python-docx"""
     try:
+        import docx
         from docx import Document
         
         doc = Document(file_path)
@@ -86,8 +87,9 @@ def _extract_from_docx(file_path: str) -> str:
         logger.info(f"✅ Extracted {len(extracted_text)} characters from DOCX")
         return extracted_text
         
-    except ImportError:
-        logger.error("python-docx not installed. Run: pip install python-docx")
+    except ImportError as ie:
+        logger.error(f"python-docx import error: {ie}. Run: pip install python-docx")
+        return None
         return None
     except Exception as e:
         logger.error(f"DOCX extraction failed: {e}")
