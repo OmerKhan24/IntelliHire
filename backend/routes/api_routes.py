@@ -29,7 +29,7 @@ github_copilot_service = None  # For question generation and scoring
 
 
 def init_services(config):
-    """Initialize external AI services (Gemini for TTS, GitHub Copilot for Q&A)"""
+    """Initialize external AI services (Gemini for TTS, DeepSeek for Q&A)"""
     global gemini_service, github_copilot_service
     try:
         gemini_service = GeminiService()
@@ -37,12 +37,12 @@ def init_services(config):
     except Exception as e:
         logger.warning(f"⚠️ Google TTS service not available: {e}")
     
-    # Enable GitHub Copilot for question generation and scoring
+    # Enable DeepSeek for question generation and scoring
     try:
         github_copilot_service = GitHubCopilotService()
-        logger.info("✅ GitHub Copilot AI service initialized successfully")
+        logger.info("✅ DeepSeek AI service initialized successfully")
     except Exception as e:
-        logger.warning(f"⚠️ GitHub Copilot service not available: {e}")
+        logger.warning(f"⚠️ DeepSeek service not available: {e}")
     
     # CV Monitoring service is auto-initialized on import
     if cv_monitoring_service.enabled:
@@ -767,10 +767,101 @@ def submit_response(interview_id):
         db.session.commit()
 
         logger.info(f"✅ Response submitted for interview {interview_id} with AI scoring")
+        
+        # GENERATE FOLLOW-UP QUESTION if answer quality is low/medium (<85 avg score)
+        followup_question_data = None
+        if github_copilot_service and github_copilot_service.enabled and question and answer_text:
+            try:
+                # CHECK FOLLOW-UP LIMITS BEFORE GENERATING
+                # 1. Check if this question already has a follow-up
+                existing_followup = Question.query.filter_by(
+                    interview_id=interview_id,
+                    parent_question_id=question.id,
+                    is_followup=True
+                ).first()
+                
+                if existing_followup:
+                    logger.info(f"⏭️ Question {question.id} already has a follow-up, skipping")
+                elif question.is_followup:
+                    logger.info(f"⏭️ This is already a follow-up question, no nested follow-ups")
+                else:
+                    # 2. Check total follow-up count for this interview
+                    total_followups = Question.query.filter_by(
+                        interview_id=interview_id,
+                        is_followup=True
+                    ).count()
+                    
+                    # Get total planned questions
+                    total_questions = Question.query.filter_by(interview_id=interview_id).count()
+                    MAX_FOLLOWUPS = max(2, total_questions // 3)  # Max 1 follow-up per 3 questions, minimum 2
+                    
+                    if total_followups >= MAX_FOLLOWUPS:
+                        logger.info(f"⏭️ Maximum follow-ups reached ({total_followups}/{MAX_FOLLOWUPS}), skipping")
+                    else:
+                        # Extract CV text if available
+                        cv_text = None
+                        if interview and interview.cv_file_path:
+                            try:
+                                from utils.cv_parser import extract_text_from_cv
+                                cv_text = extract_text_from_cv(interview.cv_file_path)
+                            except Exception as cv_err:
+                                logger.warning(f"⚠️ CV parsing for follow-up failed: {cv_err}")
+                        
+                        # Get job context
+                        job_context = f"{job.title}: {job.description[:200]}" if job else "General position"
+                        
+                        # Generate follow-up question
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        followup_text = loop.run_until_complete(
+                            github_copilot_service.generate_followup_question(
+                                original_question=question.question,
+                                candidate_answer=answer_text,
+                                analysis_scores=scores,
+                                job_context=job_context,
+                                cv_text=cv_text
+                            )
+                        )
+                        loop.close()
+                        
+                        # If follow-up was generated, save it to database
+                        if followup_text:
+                            # Get the max order_index for this interview
+                            max_order = db.session.query(db.func.max(Question.order_index)).filter_by(
+                                interview_id=interview_id
+                            ).scalar() or 0
+                            
+                            # Create follow-up question
+                            followup_question = Question(
+                                interview_id=interview_id,
+                                question=followup_text,
+                                question_type='followup',
+                                parent_question_id=question.id,
+                                is_followup=True,
+                                order_index=max_order + 1,
+                                ai_context={
+                                    'generated_from_response_id': response.id,
+                                    'original_question_id': question.id,
+                                    'trigger_scores': scores
+                                }
+                            )
+                            db.session.add(followup_question)
+                            db.session.commit()
+                            
+                            followup_question_data = followup_question.to_dict()
+                            logger.info(f"✅ Follow-up question generated and saved: Q{followup_question.id} (total follow-ups: {total_followups + 1}/{MAX_FOLLOWUPS})")
+                        else:
+                            logger.info(f"✅ No follow-up needed - answer was comprehensive")
+                    
+            except Exception as followup_err:
+                logger.error(f"⚠️ Follow-up generation failed: {followup_err}")
+                # Don't fail the whole request if follow-up fails
+        
         return jsonify({
             'success': True, 
             'response': response.to_dict(),
-            'ai_feedback': scores['ai_feedback']
+            'ai_feedback': scores['ai_feedback'],
+            'followup_question': followup_question_data  # New question if generated
         }), 201
 
     except Exception as e:
@@ -1223,6 +1314,35 @@ def get_job_report(job_id):
         return jsonify({'error': str(e)}), 500
 
 
+@report_bp.route('/job/<int:job_id>/download', methods=['GET'])
+def download_job_report(job_id):
+    """Download job report as JSON file"""
+    try:
+        job = Job.query.get(job_id)
+        if not job:
+            return jsonify({'error': 'Job not found'}), 404
+
+        interviews = Interview.query.filter_by(job_id=job_id).all()
+        
+        report_data = {
+            'job': job.to_dict(),
+            'interviews': [i.to_dict() for i in interviews],
+            'generated_at': datetime.utcnow().isoformat()
+        }
+        
+        # Create JSON response with download headers
+        response = jsonify(report_data)
+        response.headers['Content-Disposition'] = f'attachment; filename=interview-report-{job.title.replace(" ", "-")}.json'
+        response.headers['Content-Type'] = 'application/json'
+        
+        logger.info(f"✅ Downloaded report for job {job_id}")
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to download job report: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @report_bp.route('/all', methods=['GET'])
 def get_all_reports():
     """Get summary of all interviews"""
@@ -1349,12 +1469,34 @@ def stop_monitoring(interview_id):
         return '', 200
     
     try:
+        import numpy as np
+        
+        def convert_numpy_types(obj):
+            """Recursively convert numpy types to Python types"""
+            if isinstance(obj, dict):
+                return {key: convert_numpy_types(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_numpy_types(item) for item in obj]
+            elif isinstance(obj, (np.bool_, np.bool8)):
+                return bool(obj)
+            elif isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64)):
+                return int(obj)
+            elif isinstance(obj, (np.float16, np.float32, np.float64)):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            else:
+                return obj
+        
         logger.info(f"🏁 Stopping CV monitoring for interview {interview_id}")
         
         # Stop monitoring and get report
         report = cv_monitoring_service.stop_monitoring(interview_id)
         
         if report['success']:
+            # Convert numpy types to Python types for JSON serialization
+            report = convert_numpy_types(report)
+            
             # Save monitoring report to interview
             interview = Interview.query.get(interview_id)
             if interview:

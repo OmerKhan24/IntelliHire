@@ -1,14 +1,14 @@
 """
 HR Chatbot Service - AI-powered assistant for employee queries
 Uses RAG to provide context-aware responses from company documents
-Integrates with GitHub Models (GPT-4o-mini) for natural language understanding
+Integrates with DeepSeek AI (deepseek-chat) for natural language understanding
 """
 
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import os
-import requests
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +19,20 @@ class HRChatbotService:
     retrieved company documents and policies (RAG approach)
     """
     
-    def __init__(self, github_token: str, rag_service):
+    def __init__(self, deepseek_api_key: str, rag_service):
         """
-        Initialize HR Chatbot with GitHub Models API and RAG service
+        Initialize HR Chatbot with DeepSeek API and RAG service
         
         Args:
-            github_token: GitHub personal access token
+            deepseek_api_key: DeepSeek API key
             rag_service: HRDocumentRAGService instance for document retrieval
         """
         self.rag_service = rag_service
-        self.github_token = github_token
-        self.api_url = "https://models.inference.ai.azure.com/chat/completions"
-        self.model = "gpt-4o-mini"
+        self.client = OpenAI(
+            api_key=deepseek_api_key,
+            base_url="https://api.deepseek.com"
+        )
+        self.model = "deepseek-chat"
         
         # System prompt for HR assistant persona
         self.system_prompt = """You are a helpful and professional HR assistant for IntelliHire company.
@@ -53,7 +55,7 @@ Guidelines:
 
 Remember: You have access to company policy documents to provide accurate answers."""
         
-        logger.info("✅ HR Chatbot Service initialized with GitHub Models (GPT-4o-mini)")
+        logger.info("✅ HR Chatbot Service initialized with DeepSeek AI (deepseek-chat)")
     
     def _format_context_from_documents(
         self, 
@@ -160,27 +162,19 @@ INSTRUCTIONS:
 
 YOUR RESPONSE:"""
             
-            # Generate response with GitHub Models API
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.github_token}"
-            }
-            
-            payload = {
-                "model": self.model,
-                "messages": [
+            # Generate response with DeepSeek API using OpenAI SDK
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": prompt}
                 ],
-                "temperature": 0.7,
-                "max_tokens": 1000
-            }
+                temperature=0.7,
+                max_tokens=1000,
+                stream=False
+            )
             
-            response = requests.post(self.api_url, json=payload, headers=headers)
-            response.raise_for_status()
-            
-            result = response.json()
-            ai_response = result['choices'][0]['message']['content'].strip()
+            ai_response = response.choices[0].message.content.strip()
             
             # Extract source documents (unique titles)
             sources = []

@@ -39,13 +39,13 @@ def init_hr_services(config):
             embedding_model="all-MiniLM-L6-v2"
         )
         
-        # Initialize chatbot service with GitHub token
-        github_token = os.getenv('GITHUB_TOKEN_HR')
-        if not github_token:
-            raise ValueError("GITHUB_TOKEN_HR not found in environment")
+        # Initialize chatbot service with DeepSeek API
+        deepseek_api_key = os.getenv('DEEPSEEK_API_KEY')
+        if not deepseek_api_key:
+            raise ValueError("DEEPSEEK_API_KEY not found in environment")
         
         hr_chatbot_service = HRChatbotService(
-            github_token=github_token,
+            deepseek_api_key=deepseek_api_key,
             rag_service=hr_rag_service
         )
         

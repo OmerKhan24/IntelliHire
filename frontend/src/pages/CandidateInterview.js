@@ -508,6 +508,14 @@ const CandidateInterview = () => {
         answer_text: currentAnswer
       });
       
+      // Check if a follow-up question was generated
+      const followupQuestion = response.data.followup_question;
+      if (followupQuestion) {
+        console.log('🔄 Follow-up question generated:', followupQuestion.question);
+        // Add follow-up question to the questions array dynamically
+        setQuestions(prevQuestions => [...prevQuestions, followupQuestion]);
+      }
+      
       // Upload audio recording if available
       if (audioChunks.length > 0) {
         try {
@@ -733,7 +741,7 @@ const CandidateInterview = () => {
                   <Typography sx={{ color: 'rgba(255,255,255,0.8)', mb: 2 }}>
                     {job.description}
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <Chip 
                       icon={<TimerIcon />} 
                       label={`Duration: ${job.duration_minutes} minutes`}
@@ -1059,7 +1067,7 @@ const CandidateInterview = () => {
                   )}
 
                   {/* Voice Controls */}
-                  <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  <Box sx={{ mb: 3, display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                     <Button
                       variant={isListening ? "contained" : "outlined"}
                       color={isListening ? "error" : "primary"}
@@ -1095,7 +1103,7 @@ const CandidateInterview = () => {
                   {/* Live transcription indicator */}
                   {isListening && (
                     <Alert severity="info" sx={{ mb: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <MicIcon sx={{ animation: 'pulse 1.5s infinite' }} />
                         <span>Listening... {voiceTranscript && `"${voiceTranscript}"`}</span>
                       </Box>

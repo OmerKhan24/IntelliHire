@@ -1,4 +1,11 @@
 import os
+
+# Fix MediaPipe protobuf compatibility issue - MUST be set before ANY imports
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+
+# Disable ChromaDB telemetry to avoid annoying errors
+os.environ['ANONYMIZED_TELEMETRY'] = 'False'
+
 from datetime import datetime
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -11,9 +18,6 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Disable ChromaDB telemetry to avoid annoying errors
-os.environ['ANONYMIZED_TELEMETRY'] = 'False'
 
 def create_app(config_name='development'):
     """

@@ -127,11 +127,25 @@ class Question(db.Model):
     expected_duration = db.Column(db.Integer)
     order_index = db.Column(db.Integer)
     ai_context = db.Column(db.JSON)
+    parent_question_id = db.Column(db.Integer, db.ForeignKey('questions.id'), nullable=True)  # For follow-up questions
+    is_followup = db.Column(db.Boolean, default=False)  # Flag to identify follow-up questions
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     responses = db.relationship('Response', backref='question', lazy=True, cascade='all, delete-orphan')
     
     def to_dict(self):
-        return {'id': self.id, 'interview_id': self.interview_id, 'question': self.question, 'question_type': self.question_type, 'difficulty_level': self.difficulty_level, 'expected_duration': self.expected_duration, 'order_index': self.order_index, 'ai_context': self.ai_context or {}, 'created_at': self.created_at.isoformat() if self.created_at else None}
+        return {
+            'id': self.id, 
+            'interview_id': self.interview_id, 
+            'question': self.question, 
+            'question_type': self.question_type, 
+            'difficulty_level': self.difficulty_level, 
+            'expected_duration': self.expected_duration, 
+            'order_index': self.order_index, 
+            'ai_context': self.ai_context or {}, 
+            'parent_question_id': self.parent_question_id,
+            'is_followup': self.is_followup,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
 
 
 class Response(db.Model):

@@ -2,8 +2,26 @@
 CV Monitoring Service - Backend integration for face detection, gaze tracking, and mobile detection
 Enhanced with debugging and diagnostics
 """
+
 import os
 import sys
+
+# CRITICAL: Set this BEFORE any other imports
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+
+# Force protobuf 3 behavior
+import google.protobuf
+if hasattr(google.protobuf, '__version__'):
+    version = google.protobuf.__version__
+    if version.startswith('4.'):
+        print(f"⚠️  Warning: Protobuf {version} detected. MediaPipe requires 3.x")
+
+import os
+import sys
+
+# Fix MediaPipe protobuf compatibility issue - MUST be set BEFORE importing cv_monitoring
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+
 import cv2
 import numpy as np
 import logging
@@ -309,6 +327,9 @@ class CVMonitoringService:
     def _save_screenshot(self, frame: np.ndarray, interview_id: int, detection: Any) -> Optional[str]:
         """Save screenshot of critical alert"""
         try:
+            # Ensure directory exists
+            os.makedirs(self.screenshots_dir, exist_ok=True)
+            
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
             filename = f"interview_{interview_id}_{detection.detection_type}_{timestamp}.jpg"
             filepath = os.path.join(self.screenshots_dir, filename)
@@ -319,13 +340,20 @@ class CVMonitoringService:
             cv2.putText(frame_copy, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             
             # Save image
-            cv2.imwrite(filepath, frame_copy)
+            success = cv2.imwrite(filepath, frame_copy)
             
-            # Return relative path for database storage
-            return f"cv_screenshots/{filename}"
+            if success:
+                logger.info(f"📸 Saved screenshot: {filename}")
+                # Return relative path for database storage
+                return f"/api/monitoring/screenshots/{filename}"
+            else:
+                logger.error(f"Failed to write screenshot file: {filepath}")
+                return None
             
         except Exception as e:
             logger.error(f"Failed to save screenshot: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def stop_monitoring(self, interview_id: int) -> Dict[str, Any]:

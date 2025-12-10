@@ -1,126 +1,83 @@
 import os
 import asyncio
-import aiohttp
 from concurrent.futures import ThreadPoolExecutor
+from openai import AsyncOpenAI
 
 
 class GitHubCopilotService:
     """
-    GitHub Copilot API service for AI-powered question generation, 
-    answer analysis, and interview assessment using GPT-4o-mini.
+    DeepSeek API service for AI-powered question generation, 
+    answer analysis, follow-up question generation, and interview assessment using deepseek-chat.
     """
     
     def __init__(self):
         self.executor = ThreadPoolExecutor(max_workers=3)
-        # GitHub Models API configuration - Try both endpoints
-        self.endpoints = [
-            "https://models.inference.ai.azure.com/chat/completions",
-            "https://models.github.ai/inference/chat/completions"
-        ]
-        self.endpoint = self.endpoints[0]  # Start with Azure endpoint
+        # DeepSeek API configuration
+        self.base_url = "https://api.deepseek.com"
+        self.model = "deepseek-chat"
         
-        # GPT-5 Models available on GitHub Models (Released Aug 2025):
-        # - gpt-5: Full reasoning model for complex tasks
-        # - gpt-5-mini: Balanced reasoning and speed (RECOMMENDED)
-        # - gpt-5-nano: Ultra-fast for simple tasks
-        # - gpt-5-chat: Natural conversations
-        self.model = "gpt-5-mini"
+        api_key = os.environ.get('DEEPSEEK_API_KEY')
+        print(f"🔑 DEEPSEEK_API_KEY found: {bool(api_key)}")
         
-        token = os.environ.get('GITHUB_TOKEN')
-        print(f"🔑 GITHUB_TOKEN found: {bool(token)}")
-        
-        if token:
-            print(f"🔑 Token (first 15 chars): {token[:15]}...")
-            self.token = token
+        if api_key:
+            print(f"🔑 API Key (first 15 chars): {api_key[:15]}...")
+            self.client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=self.base_url
+            )
             self.enabled = True
-            print(f"✅ GitHub Copilot service enabled with model: {self.model}")
+            print(f"✅ DeepSeek service enabled with model: {self.model}")
         else:
-            self.token = None
+            self.client = None
             self.enabled = False
-            print("❌ GITHUB_TOKEN not found - running in fallback mode")
+            print("❌ DEEPSEEK_API_KEY not found - running in fallback mode")
     
     async def _call_api(self, messages, retry_count=0):
-        """Make async HTTP request to GitHub Models API with retry logic and exponential backoff"""
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28"
-        }
-        
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            # GPT-5 models only support temperature=1 (default), so we omit it
-            "max_completion_tokens": 2000
-        }
-        
-        # Increase timeout to 120 seconds
-        timeout = aiohttp.ClientTimeout(total=120)
-        
+        """Make async API call to DeepSeek using OpenAI SDK with retry logic and exponential backoff"""
         try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(self.endpoint, json=payload, headers=headers) as response:
-                    if response.status == 429:
-                        # Rate limited - implement exponential backoff
-                        if retry_count < 3:
-                            wait_time = (2 ** retry_count) * 2  # 2, 4, 8 seconds
-                            print(f"⏳ Rate limited, waiting {wait_time}s before retry {retry_count + 1}/3...")
-                            await asyncio.sleep(wait_time)
-                            return await self._call_api(messages, retry_count + 1)
-                        else:
-                            error_text = await response.text()
-                            raise Exception(f"API rate limit exceeded after {retry_count} retries: {error_text}")
-                    
-                    if response.status != 200:
-                        error_text = await response.text()
-                        
-                        # Try alternate endpoint if first one fails (not for rate limit)
-                        if retry_count == 0 and len(self.endpoints) > 1:
-                            print(f"⚠️ First endpoint failed, trying alternate endpoint...")
-                            self.endpoint = self.endpoints[1]
-                            return await self._call_api(messages, retry_count=1)
-                        
-                        raise Exception(f"API error {response.status}: {error_text}")
-                    
-                    # Get raw response text first
-                    text = await response.text()
-                    
-                    # Handle empty responses
-                    if not text or text.strip() == '':
-                        raise Exception("API returned empty response")
-                    
-                    # Try to parse as JSON regardless of content-type
-                    try:
-                        import json
-                        result = json.loads(text)
-                        
-                        # Validate response structure
-                        if 'choices' not in result or len(result['choices']) == 0:
-                            raise Exception(f"Invalid API response structure: {text[:200]}")
-                        
-                        content = result['choices'][0]['message']['content']
-                        
-                        if not content or content.strip() == '':
-                            raise Exception("API returned empty content")
-                        
-                        return content
-                        
-                    except json.JSONDecodeError as e:
-                        print(f"❌ JSON parse error: {e}")
-                        print(f"📄 Raw response (first 500 chars): {text[:500]}")
-                        raise Exception(f"Failed to parse API response as JSON: {str(e)}")
-                        
-        except asyncio.TimeoutError:
-            if retry_count == 0:
-                print(f"⏱️ Request timed out, retrying...")
-                return await self._call_api(messages, retry_count=1)
-            else:
-                raise Exception("API request timed out after retry")
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=2000,
+                temperature=1.0,
+                stream=False
+            )
+            
+            content = response.choices[0].message.content
+            
+            if not content or content.strip() == '':
+                raise Exception("API returned empty content")
+            
+            return content
+            
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Handle rate limiting
+            if 'rate' in error_msg.lower() or '429' in error_msg:
+                if retry_count < 3:
+                    wait_time = (2 ** retry_count) * 2  # 2, 4, 8 seconds
+                    print(f"⏳ Rate limited, waiting {wait_time}s before retry {retry_count + 1}/3...")
+                    await asyncio.sleep(wait_time)
+                    return await self._call_api(messages, retry_count + 1)
+                else:
+                    raise Exception(f"API rate limit exceeded after {retry_count} retries")
+            
+            # Handle timeout
+            if 'timeout' in error_msg.lower():
+                if retry_count == 0:
+                    print(f"⏱️ Request timed out, retrying...")
+                    await asyncio.sleep(2)
+                    return await self._call_api(messages, retry_count + 1)
+                else:
+                    raise Exception("API request timed out after retry")
+            
+            # Re-raise other exceptions
+            raise
     
     async def generate_questions(self, job_description, requirements, num_questions=5, cv_text=None, duration_minutes=20, scoring_criteria=None):
         """
-        Generate interview questions using GitHub Copilot API
+        Generate interview questions using DeepSeek API
         
         Args:
             job_description: Job description text
@@ -131,7 +88,7 @@ class GitHubCopilotService:
             scoring_criteria: Scoring weights for different aspects (dict or string)
         """
         if not self.enabled:
-            print("⚠️ GitHub Copilot disabled, using fallback questions")
+            print("⚠️ DeepSeek disabled, using fallback questions")
             return self._generate_fallback_questions(job_description, requirements, num_questions)
         
         # Parse scoring criteria - handle both dict and string formats
@@ -230,7 +187,7 @@ Example format:
 1. Tell me about yourself and what drew you to apply for this position?
 2. [Next question]..."""
             
-            print(f"🤖 Calling GitHub Copilot API for question generation...")
+            print(f"🤖 Calling DeepSeek API for question generation...")
             print(f"📝 Prompt length: {len(user_prompt)} chars")
             
             messages = [
@@ -240,7 +197,7 @@ Example format:
             
             text = await self._call_api(messages)
             
-            print(f"✅ GitHub Copilot API response received")
+            print(f"✅ DeepSeek API response received")
             print(f"📄 Response length: {len(text)} chars")
             print(f"📄 Response preview: {text[:200]}...")
             
@@ -273,7 +230,7 @@ Example format:
     
     async def analyze_response(self, question, answer, job_context=None, cv_text=None):
         """
-        Analyze candidate's response using GitHub Copilot API
+        Analyze candidate's response using DeepSeek API
         
         Args:
             question: Interview question asked
@@ -285,7 +242,7 @@ Example format:
             dict: Analysis with relevance, technical, communication, confidence scores and feedback
         """
         if not self.enabled:
-            print("⚠️ GitHub Copilot disabled, using fallback analysis")
+            print("⚠️ DeepSeek disabled, using fallback analysis")
             return self._generate_fallback_analysis(question, answer)
         
         try:
@@ -337,7 +294,7 @@ Communication: [score]
 Confidence: [score]
 Feedback: [Your detailed feedback here]"""
             
-            print(f"🤖 Calling GitHub Copilot API for answer analysis...")
+            print(f"🤖 Calling DeepSeek API for answer analysis...")
             
             messages = [
                 {"role": "system", "content": "You are an expert technical interviewer. Analyze candidate responses and provide detailed scoring and feedback."},
@@ -346,7 +303,7 @@ Feedback: [Your detailed feedback here]"""
             
             text = await self._call_api(messages)
             
-            print(f"✅ GitHub Copilot analysis received: {len(text)} chars")
+            print(f"✅ DeepSeek analysis received: {len(text)} chars")
             
             # Parse scores from AI response
             analysis = {
@@ -408,7 +365,7 @@ Feedback: [Your detailed feedback here]"""
     
     async def generate_final_analysis(self, interview_data, responses_data, job_data):
         """
-        Generate comprehensive final interview analysis using GitHub Copilot API
+        Generate comprehensive final interview analysis using DeepSeek API
         
         Args:
             interview_data: Interview metadata and aggregate scores
@@ -419,7 +376,7 @@ Feedback: [Your detailed feedback here]"""
             dict: Final analysis with assessment, strengths, weaknesses, recommendation, next steps
         """
         if not self.enabled:
-            print("⚠️ GitHub Copilot disabled, using fallback final analysis")
+            print("⚠️ DeepSeek disabled, using fallback final analysis")
             return self._generate_fallback_final_analysis(interview_data, responses_data)
         
         try:
@@ -460,7 +417,7 @@ Next Steps: [Brief next steps]
 
 Keep responses SHORT and focused."""
             
-            print(f"🤖 Calling GitHub Copilot API for final analysis...")
+            print(f"🤖 Calling DeepSeek API for final analysis...")
             
             messages = [
                 {"role": "system", "content": "You are an expert HR interviewer. Provide comprehensive final assessment of candidates based on their interview performance."},
@@ -469,7 +426,7 @@ Keep responses SHORT and focused."""
             
             text = await self._call_api(messages)
             
-            print(f"✅ GitHub Copilot final analysis received: {len(text)} chars")
+            print(f"✅ DeepSeek final analysis received: {len(text)} chars")
             
             # Parse the AI response
             analysis = {
@@ -529,3 +486,94 @@ Keep responses SHORT and focused."""
             'recommendation': 'Recommended for next round' if avg_score >= 70 else 'Consider for future opportunities',
             'next_steps': 'Schedule technical round' if avg_score >= 80 else 'Review and provide feedback'
         }
+    
+    async def generate_followup_question(self, original_question, candidate_answer, analysis_scores, job_context=None, cv_text=None):
+        """
+        Generate intelligent follow-up question based on candidate's response quality and content
+        
+        Args:
+            original_question: The question that was asked
+            candidate_answer: Candidate's response
+            analysis_scores: Dict with relevance, technical, communication, confidence scores
+            job_context: Job description context
+            cv_text: Candidate's CV for personalization
+        
+        Returns:
+            str: Follow-up question or None if answer was comprehensive
+        """
+        if not self.enabled:
+            print("⚠️ DeepSeek disabled, no follow-up generation")
+            return None
+        
+        try:
+            # Determine if follow-up is needed based on scores
+            avg_score = (
+                analysis_scores.get('relevance_score', 0) +
+                analysis_scores.get('technical_score', 0) +
+                analysis_scores.get('communication_score', 0) +
+                analysis_scores.get('confidence_score', 0)
+            ) / 4
+            
+            # Don't generate follow-up if answer was good (>70) - only for weak answers
+            if avg_score > 70:
+                print(f"✅ Answer scored {avg_score}/100 - No follow-up needed")
+                return None
+            
+            cv_context = f"\n\nCandidate's Background:\n{cv_text[:600]}" if cv_text else ""
+            job_info = f"\n\nJob Context:\n{job_context}" if job_context else ""
+            
+            user_prompt = f"""You are an expert technical interviewer conducting a live interview. Based on the candidate's response, generate ONE SPECIFIC follow-up question.
+
+ORIGINAL QUESTION: {original_question}
+
+CANDIDATE'S ANSWER:
+{candidate_answer}
+
+RESPONSE ANALYSIS:
+- Relevance: {analysis_scores.get('relevance_score', 0)}/100
+- Technical Depth: {analysis_scores.get('technical_score', 0)}/100
+- Communication: {analysis_scores.get('communication_score', 0)}/100
+- Confidence: {analysis_scores.get('confidence_score', 0)}/100
+- Overall: {avg_score:.1f}/100
+
+FEEDBACK: {analysis_scores.get('feedback', 'N/A')}{job_info}{cv_context}
+
+Generate ONE follow-up question that:
+1. If answer was vague (low relevance/technical): Ask for specific examples or technical details
+2. If answer was incomplete: Probe deeper into missing aspects
+3. If answer lacked confidence: Ask about practical experience or problem-solving
+4. If answer was superficial: Request implementation details or edge cases
+5. Build on what they said - make it conversational and natural
+
+RULES:
+- Return ONLY the follow-up question text, nothing else
+- Make it conversational (e.g., "Can you elaborate on...", "Tell me more about...")
+- Keep it under 25 words
+- Focus on ONE specific aspect to clarify
+- If answer was comprehensive (>85 score), return: "SKIP"
+
+Follow-up Question:"""
+
+            print(f"🤖 Generating follow-up question (avg score: {avg_score:.1f}/100)...")
+            
+            messages = [
+                {"role": "system", "content": "You are an expert interviewer who asks intelligent follow-up questions to probe deeper into candidate responses. You return ONLY the question text, or 'SKIP' if no follow-up is needed."},
+                {"role": "user", "content": user_prompt}
+            ]
+            
+            followup = await self._call_api(messages)
+            followup = followup.strip()
+            
+            # Check if we should skip
+            if followup.upper() == "SKIP" or "SKIP" in followup.upper()[:10]:
+                print(f"✅ AI decided no follow-up needed")
+                return None
+            
+            print(f"✅ Generated follow-up: {followup[:80]}...")
+            return followup
+            
+        except Exception as e:
+            print(f"❌ Error generating follow-up question: {e}")
+            import traceback
+            traceback.print_exc()
+            return None

@@ -169,24 +169,8 @@ const CandidateDashboard = () => {
           backdropFilter: 'blur(20px)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
         }}
-      > 
-        position="static" 
-        elevation={0}
-        sx={{
-          background: alpha('#000', 0.2),
-          backdropFilter: 'blur(20px)',
-          borderBottom: `1px solid ${alpha('#fff', 0.1)}`
-        }}
       >
         <Toolbar>
-          <IconButton 
-            edge="start" 
-            color="inherit" 
-            onClick={() => navigate('/')}
-            sx={{ mr: 2 }}
-          >
-            <BackIcon />
-          </IconButton>
           <WorkIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700 }}>
             My Dashboard
@@ -305,8 +289,8 @@ const CandidateDashboard = () => {
               }
             }}
           >
-            }}
-          >
+            
+          
             <CardContent sx={{ p: 4, position: 'relative', zIndex: 1 }}>
               <Box display="flex" alignItems="center" gap={2} mb={3}>
                 <Box
@@ -433,7 +417,7 @@ const CandidateDashboard = () => {
                   <Typography 
                     variant="body1" 
                     sx={{ 
-                      color: alpha('#fff', 0.7),
+                      color: "black",
                       maxWidth: 400,
                       mx: 'auto'
                     }}
@@ -612,7 +596,7 @@ const CandidateDashboard = () => {
               <Typography 
                 variant="body1" 
                 sx={{ 
-                  color: alpha('#fff', 0.9),
+                  color: "black",
                   mb: 2,
                   fontWeight: 500,
                   lineHeight: 1.6

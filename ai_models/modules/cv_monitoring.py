@@ -2,6 +2,10 @@
 Computer Vision Monitoring Module
 Detects cheating behaviors: mobile phones, multiple faces, gaze tracking, suspicious movements
 """
+import os
+# Fix MediaPipe protobuf compatibility issue - MUST be set before importing mediapipe
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+
 import cv2
 import numpy as np
 import logging
@@ -38,13 +42,19 @@ class DetectionResult:
 class CVMonitoringSystem:
     """Computer Vision based monitoring system for interview integrity"""
     
-    def __init__(self):
-        """Initialize CV monitoring system"""
+    def __init__(self, strict_mode=True):
+        """
+        Initialize CV monitoring system
+        
+        Args:
+            strict_mode: If True (DEFAULT), uses strict proctoring thresholds to catch cheating
+        """
         self.mp_face_detection = None
         self.mp_face_mesh = None
         self.mp_hands = None
         self.yolo_model = None
         self.face_detector = None
+        self.strict_mode = strict_mode
         
         # Monitoring state
         self.baseline_face_position = None
@@ -54,14 +64,16 @@ class CVMonitoringSystem:
         self.suspicious_movement_count = 0
         self.gaze_deviation_count = 0  # Track consecutive gaze deviations
         
-        # Configuration
+        # Configuration - STRICT BY DEFAULT for proctoring
+        # Interview/exam scenario: candidate should look at camera/screen, not elsewhere
         self.config = {
-            "face_absence_threshold": 20,  # frames
-            "multiple_face_threshold": 5,  # frames
-            "phone_detection_threshold": 3,  # frames
-            "gaze_deviation_threshold": 0.15,  # normalized (lowered for better sensitivity)
-            "gaze_consecutive_frames": 6,  # frames before triggering alert
-            "movement_threshold": 50,  # pixels
+            "face_absence_threshold": 15,  # frames (5 seconds)
+            "multiple_face_threshold": 3,  # frames (1 second) 
+            "phone_detection_threshold": 2,  # frames
+            "gaze_deviation_threshold": 0.18,  # MORE STRICT - flags looking away from camera
+            "gaze_consecutive_frames": 4,  # 1.3 seconds of looking away = suspicious (reduced from 9)
+            "extreme_gaze_threshold": 0.3,  # Looking significantly away (reduced from 0.4)
+            "movement_threshold": 40,  # pixels
             "confidence_threshold": 0.5
         }
         
@@ -336,14 +348,27 @@ class CVMonitoringSystem:
                     # Calculate gaze direction with improved algorithm
                     gaze_info = self._calculate_gaze_direction(face_landmarks, rgb_frame.shape)
                     
-                    # Check if gaze is deviated
-                    if gaze_info["deviation"] > self.config["gaze_deviation_threshold"]:
+                    # Determine if this is extreme deviation (looking significantly away)
+                    is_extreme = gaze_info["deviation"] > self.config["extreme_gaze_threshold"]
+                    is_moderate = gaze_info["deviation"] > self.config["gaze_deviation_threshold"]
+                    
+                    # In proctored exam: ANY looking away is suspicious
+                    if is_extreme or is_moderate:
                         self.gaze_deviation_count += 1
                         
+                        # Extreme deviation triggers very fast (immediate suspicion)
+                        # Moderate deviation needs 1.3 seconds to confirm pattern
+                        required_frames = 2 if is_extreme else self.config["gaze_consecutive_frames"]
+                        
                         # Only trigger alert after consecutive deviations
-                        if self.gaze_deviation_count >= self.config["gaze_consecutive_frames"]:
+                        if self.gaze_deviation_count >= required_frames:
                             # Determine alert level based on severity
-                            alert_level = AlertLevel.HIGH if gaze_info["deviation"] > 0.3 else AlertLevel.MEDIUM
+                            if is_extreme:
+                                alert_level = AlertLevel.CRITICAL
+                                message = f"SUSPICIOUS: Looking {gaze_info['direction']} - possible second screen/notes"
+                            else:
+                                alert_level = AlertLevel.HIGH
+                                message = f"WARNING: Gaze deviation - looking {gaze_info['direction']}"
                             
                             results.append(DetectionResult(
                                 timestamp=timestamp,
@@ -351,18 +376,21 @@ class CVMonitoringSystem:
                                 detection_type="gaze_deviation",
                                 confidence=gaze_info["confidence"],
                                 details={
-                                    "message": f"Looking {gaze_info['direction']} - not at screen",
+                                    "message": message,
                                     "gaze_direction": gaze_info["direction"],
                                     "deviation": round(gaze_info["deviation"], 3),
                                     "head_pose": gaze_info.get("head_pose", "unknown"),
                                     "threshold": self.config["gaze_deviation_threshold"],
-                                    "count": self.gaze_deviation_count
+                                    "extreme_threshold": self.config["extreme_gaze_threshold"],
+                                    "count": self.gaze_deviation_count,
+                                    "is_extreme": is_extreme,
+                                    "risk": "HIGH - Could be using second monitor, notes, or assistance"
                                 }
                             ))
-                            # Reset after alert
+                            # Keep counting to track duration
                             self.gaze_deviation_count = max(0, self.gaze_deviation_count - 5)
                     else:
-                        # Reset count if gaze returns to normal
+                        # Only gradually reset when looking at camera
                         self.gaze_deviation_count = max(0, self.gaze_deviation_count - 1)
             
             return results
@@ -386,22 +414,27 @@ class CVMonitoringSystem:
             
             # Simulated movement detection
             if hasattr(self, '_prev_frame') and self._prev_frame is not None:
-                # Calculate frame difference
-                diff = cv2.absdiff(frame, self._prev_frame)
-                movement_score = np.mean(diff)
-                
-                if movement_score > 30:  # Threshold for significant movement
-                    results.append(DetectionResult(
-                        timestamp=timestamp,
-                        alert_level=AlertLevel.LOW,
-                        detection_type="excessive_movement",
-                        confidence=0.6,
-                        details={
-                            "message": "Excessive movement detected",
-                            "movement_score": movement_score,
-                            "threshold": 30
-                        }
-                    ))
+                # Ensure frames are same size before comparison
+                if self._prev_frame.shape == frame.shape:
+                    # Calculate frame difference
+                    diff = cv2.absdiff(frame, self._prev_frame)
+                    movement_score = np.mean(diff)
+                    
+                    if movement_score > 30:  # Threshold for significant movement
+                        results.append(DetectionResult(
+                            timestamp=timestamp,
+                            alert_level=AlertLevel.LOW,
+                            detection_type="excessive_movement",
+                            confidence=0.6,
+                            details={
+                                "message": "Excessive movement detected",
+                                "movement_score": float(movement_score),
+                                "threshold": 30
+                            }
+                        ))
+                else:
+                    # Resize previous frame to match current frame size
+                    self._prev_frame = cv2.resize(self._prev_frame, (frame.shape[1], frame.shape[0]))
             
             # Store current frame for next comparison
             self._prev_frame = frame.copy()
@@ -492,23 +525,35 @@ class CVMonitoringSystem:
             
             total_deviation = np.sqrt(horizontal_deviation**2 + vertical_deviation**2)
             
-            # Determine direction with better thresholds
+            # Determine direction with STRICT thresholds for proctoring
+            # In an exam/interview, candidate should face the camera
+            # Any sustained looking away = suspicious
             direction = "center"
             head_pose = "straight"
             
-            # Horizontal direction
-            if horizontal_ratio < 0.35 or head_turn < -0.1:
+            # STRICT horizontal thresholds - catch looking at second monitor/notes
+            if horizontal_ratio < 0.40 or head_turn < -0.10:
                 direction = "left"
-                head_pose = "turned left" if head_turn < -0.1 else "eyes left"
-            elif horizontal_ratio > 0.65 or head_turn > 0.1:
-                direction = "right"
-                head_pose = "turned right" if head_turn > 0.1 else "eyes right"
+                head_pose = "turned left" if head_turn < -0.10 else "eyes left"
+            elif horizontal_ratio > 0.60 or head_turn > 0.10:
+                direction = "right"  
+                head_pose = "turned right" if head_turn > 0.10 else "eyes right"
             
-            # Vertical direction (can override horizontal)
+            # Very strict for extreme deviations (definitely cheating)
+            if horizontal_ratio < 0.30 or head_turn < -0.15:
+                direction = "far-left"
+                head_pose = "head turned far left"
+            elif horizontal_ratio > 0.70 or head_turn > 0.15:
+                direction = "far-right"
+                head_pose = "head turned far right"
+            
+            # Vertical direction - looking down (phone/notes) or up is suspicious
             if vertical_ratio < 0.35:
                 direction = "up" if direction == "center" else f"{direction}-up"
+                head_pose = f"{head_pose} looking up"
             elif vertical_ratio > 0.65:
                 direction = "down" if direction == "center" else f"{direction}-down"
+                head_pose = f"{head_pose} looking down (phone/notes?)"
             
             # Calculate confidence based on eye openness and detection quality
             confidence = min(0.95, 0.7 + (left_eye_height + right_eye_width) * 0.5)

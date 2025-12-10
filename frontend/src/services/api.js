@@ -48,6 +48,9 @@ export const api = {
     getInterview: (interviewId) => apiClient.get(`/api/reports/interview/${interviewId}`),
     getJob: (jobId) => apiClient.get(`/api/reports/job/${jobId}`),
     getAll: () => apiClient.get(`/api/reports/all`),
+    downloadReport: (jobId) => apiClient.get(`/api/reports/job/${jobId}/download`, {
+      responseType: 'blob'
+    }),
   },
   // Auth
   auth: {

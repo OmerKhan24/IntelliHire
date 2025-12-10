@@ -508,17 +508,42 @@ const HRAssistant = () => {
         </Box>
       </Drawer>
 
-      <Container maxWidth="lg">
-        <Box sx={{ py: 4 }}>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #0A192F 0%, #1E3A5F 50%, #0A192F 100%)',
+          position: 'relative',
+          py: 4,
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'radial-gradient(circle at 20% 50%, rgba(8, 145, 178, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(13, 148, 136, 0.1) 0%, transparent 50%)',
+            pointerEvents: 'none'
+          }
+        }}
+      >
+        <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
           {/* Menu button to open sidebar */}
           {(activeTab === 0 || userRole !== 'interviewer') && (
             <Fab
-              color="primary"
               sx={{
                 position: 'fixed',
                 left: 16,
                 top: 16,
-                zIndex: 1000
+                zIndex: 1000,
+                background: 'linear-gradient(135deg, #0891B2 0%, #06B6D4 100%)',
+                color: 'white',
+                boxShadow: '0 8px 32px rgba(8, 145, 178, 0.4)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
+                  transform: 'scale(1.05)',
+                  boxShadow: '0 12px 40px rgba(8, 145, 178, 0.5)'
+                },
+                transition: 'all 0.3s ease'
               }}
               onClick={() => setSidebarOpen(true)}
             >
@@ -527,94 +552,209 @@ const HRAssistant = () => {
           )}
           
           {/* Back button for employees */}
-        {userRole === 'employee' && (
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/employee-dashboard')}
-            sx={{ mb: 2 }}
+          {userRole === 'employee' && (
+            <Button
+              startIcon={<ArrowBackIcon />}
+              onClick={() => navigate('/employee-dashboard')}
+              sx={{ 
+                mb: 2,
+                color: 'rgba(255,255,255,0.9)',
+                borderColor: 'rgba(255,255,255,0.3)',
+                '&:hover': {
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
+              variant="outlined"
+            >
+              Back to Dashboard
+            </Button>
+          )}
+          
+          {/* Header Card */}
+          <Paper 
+            elevation={10}
+            sx={{ 
+              p: 4, 
+              mb: 4,
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.1) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+            }}
           >
-            Back to Dashboard
-          </Button>
-        )}
-        
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <BotIcon sx={{ fontSize: 40, mr: 2, color: 'primary.main' }} />
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="h4" component="h1">
-              {userRole === 'interviewer' ? 'HR Assistant' : 'Employee Portal'}
-            </Typography>
-            <Typography color="text.secondary">
-              {userRole === 'interviewer' 
-                ? 'Manage company documents and assist employees' 
-                : 'Get answers about company policies and HR information'}
-            </Typography>
-          </Box>
-        </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <BotIcon sx={{ fontSize: 50, color: '#0891B2' }} />
+              <Box sx={{ flex: 1 }}>
+                <Typography 
+                  variant="h3" 
+                  sx={{ 
+                    fontWeight: 900,
+                    color: '#fff',
+                    background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    mb: 0.5
+                  }}
+                >
+                  {userRole === 'interviewer' ? 'HR Assistant' : 'Employee Portal'}
+                </Typography>
+                <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                  {userRole === 'interviewer' 
+                    ? 'Manage company documents and assist employees' 
+                    : 'Get answers about company policies and HR information'}
+                </Typography>
+              </Box>
+            </Box>
+          </Paper>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-            {error}
-          </Alert>
-        )}
+          {error && (
+            <Alert 
+              severity="error" 
+              sx={{ 
+                mb: 3,
+                background: 'rgba(211, 47, 47, 0.1)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(211, 47, 47, 0.3)',
+                color: '#fff',
+                '& .MuiAlert-icon': { color: '#f44336' }
+              }} 
+              onClose={() => setError('')}
+            >
+              {error}
+            </Alert>
+          )}
 
-        <Paper sx={{ mb: 2 }}>
+          <Paper 
+            sx={{ 
+              mb: 3,
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.1) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: 2,
+              overflow: 'hidden'
+            }}
+          >
           {userRole === 'interviewer' ? (
             <Tabs
               value={activeTab}
               onChange={(e, newValue) => setActiveTab(newValue)}
-              indicatorColor="primary"
-              textColor="primary"
               variant="fullWidth"
+              sx={{
+                '& .MuiTab-root': {
+                  color: 'rgba(255,255,255,0.7)',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  py: 2,
+                  '&.Mui-selected': {
+                    color: '#0891B2'
+                  }
+                },
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: '3px 3px 0 0',
+                  background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)'
+                }
+              }}
             >
               <Tab label="Chat Assistant" icon={<BotIcon />} iconPosition="start" />
               <Tab label="Document Management" icon={<DocumentIcon />} iconPosition="start" />
               <Tab label="Employee Management" icon={<PersonIcon />} iconPosition="start" />
             </Tabs>
           ) : (
-            <Box sx={{ p: 2, textAlign: 'center', backgroundColor: 'primary.main', color: 'white' }}>
-              <Typography variant="h6">
+            <Box sx={{ 
+              p: 3, 
+              textAlign: 'center',
+              background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)',
+              color: 'white'
+            }}>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
                 💬 Chat with HR Assistant
               </Typography>
             </Box>
           )}
         </Paper>
 
-        <Paper sx={{ p: 3 }}>
+        <Paper 
+          elevation={10}
+          sx={{ 
+            p: 4,
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.1) 100%)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+          }}
+        >
           {/* Chat Tab - Available to everyone */}
           {(activeTab === 0 || userRole !== 'interviewer') && (
-            <Box sx={{ height: 'calc(100vh - 250px)', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ height: 'calc(100vh - 420px)', display: 'flex', flexDirection: 'column', minHeight: '500px' }}>
               <Paper 
-                elevation={0} 
+                elevation={3}
                 sx={{ 
                   flex: 1, 
                   overflow: 'auto', 
-                  p: 2, 
-                  mb: 2,
-                  backgroundColor: '#f5f5f5'
+                  p: 3, 
+                  mb: 3,
+                  background: 'rgba(255,255,255,0.05)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 2
                 }}
               >
                 {messages.length === 0 && (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <BotIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                  <Box sx={{ textAlign: 'center', py: 6 }}>
+                    <Box
+                      sx={{
+                        width: 120,
+                        height: 120,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 24px',
+                        boxShadow: '0 8px 24px rgba(8, 145, 178, 0.4)',
+                        border: '3px solid rgba(255,255,255,0.2)'
+                      }}
+                    >
+                      <BotIcon sx={{ fontSize: 60, color: 'white' }} />
+                    </Box>
+                    <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, color: 'rgba(255,255,255,0.95)' }}>
                       Welcome to HR Assistant
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" paragraph>
+                    <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)', mb: 4 }}>
                       Ask me anything about company policies, benefits, leave, or HR procedures
                     </Typography>
                     
-                    <Box sx={{ mt: 3 }}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Try asking:
+                    <Box sx={{ mt: 4 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: 'rgba(255,255,255,0.9)' }}>
+                        💡 Try asking:
                       </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', mt: 1 }}>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, justifyContent: 'center', mt: 2 }}>
                         {suggestions.slice(0, 4).map((suggestion, index) => (
                           <Chip
                             key={index}
                             label={suggestion}
                             onClick={() => handleSuggestionClick(suggestion)}
                             clickable
-                            size="small"
+                            sx={{
+                              py: 2.5,
+                              px: 1.5,
+                              fontSize: '0.9rem',
+                              fontWeight: 500,
+                              background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)',
+                              color: 'white',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              boxShadow: '0 4px 12px rgba(8, 145, 178, 0.3)',
+                              '&:hover': {
+                                background: 'linear-gradient(135deg, #0D9488 0%, #0891B2 100%)',
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 6px 16px rgba(8, 145, 178, 0.4)'
+                              },
+                              transition: 'all 0.3s ease'
+                            }}
                           />
                         ))}
                       </Box>
@@ -634,18 +774,29 @@ const HRAssistant = () => {
                     >
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', maxWidth: '80%' }}>
                         {message.role === 'assistant' && (
-                          <Avatar sx={{ bgcolor: 'primary.main', mr: 1 }}>
+                          <Avatar sx={{ 
+                            background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)',
+                            border: '2px solid rgba(255,255,255,0.2)',
+                            mr: 1 
+                          }}>
                             <BotIcon />
                           </Avatar>
                         )}
                         
                         <Paper
-                          elevation={1}
+                          elevation={3}
                           sx={{
-                            p: 2,
-                            backgroundColor: message.role === 'user' ? 'primary.main' : 'white',
-                            color: message.role === 'user' ? 'white' : 'text.primary',
-                            borderRadius: 2
+                            p: 2.5,
+                            background: message.role === 'user' 
+                              ? 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)' 
+                              : 'rgba(255,255,255,0.1)',
+                            backdropFilter: 'blur(10px)',
+                            border: `1px solid ${message.role === 'user' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                            color: message.role === 'user' ? 'white' : 'rgba(255,255,255,0.95)',
+                            borderRadius: 2,
+                            boxShadow: message.role === 'user' 
+                              ? '0 4px 16px rgba(8, 145, 178, 0.3)'
+                              : '0 4px 16px rgba(0,0,0,0.1)'
                           }}
                         >
                           {message.role === 'assistant' ? (
@@ -762,7 +913,11 @@ const HRAssistant = () => {
                         </Paper>
 
                         {message.role === 'user' && (
-                          <Avatar sx={{ bgcolor: 'secondary.main', ml: 1 }}>
+                          <Avatar sx={{ 
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            border: '2px solid rgba(255,255,255,0.2)',
+                            ml: 1 
+                          }}>
                             <PersonIcon />
                           </Avatar>
                         )}
@@ -772,26 +927,40 @@ const HRAssistant = () => {
                   {loading && (
                     <ListItem>
                       <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                        <Avatar sx={{ bgcolor: 'primary.main', mr: 1 }}>
+                        <Avatar sx={{ 
+                          background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)',
+                          border: '2px solid rgba(255,255,255,0.2)',
+                          mr: 1 
+                        }}>
                           <BotIcon />
                         </Avatar>
                         <Paper
-                          elevation={1}
+                          elevation={3}
                           sx={{
-                            p: 2,
-                            backgroundColor: 'white',
+                            p: 2.5,
+                            background: 'rgba(255,255,255,0.1)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(255,255,255,0.1)',
                             borderRadius: 2,
                             flex: 1,
                             maxWidth: '80%'
                           }}
                         >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <CircularProgress size={20} />
+                            <CircularProgress size={20} sx={{ color: '#0891B2' }} />
                             <Box sx={{ flex: 1 }}>
-                              <Typography variant="body2" color="text.secondary">
+                              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
                                 Processing your query...
                               </Typography>
-                              <LinearProgress sx={{ mt: 1, height: 4, borderRadius: 1 }} />
+                              <LinearProgress sx={{ 
+                                mt: 1, 
+                                height: 4, 
+                                borderRadius: 1,
+                                background: 'rgba(255,255,255,0.1)',
+                                '& .MuiLinearProgress-bar': {
+                                  background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)'
+                                }
+                              }} />
                             </Box>
                           </Box>
                         </Paper>
@@ -802,8 +971,8 @@ const HRAssistant = () => {
                 </List>
               </Paper>
 
-              {/* Input Area - FIXED: No refs, pure controlled component */}
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              {/* Input Area */}
+              <Box sx={{ display: 'flex', gap: 2 }}>
                 <TextField
                   fullWidth
                   value={inputMessage}
@@ -819,12 +988,46 @@ const HRAssistant = () => {
                   maxRows={3}
                   disabled={loading}
                   autoComplete="off"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      background: 'rgba(255,255,255,0.1)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      color: 'rgba(255,255,255,0.95)',
+                      '& fieldset': {
+                        borderColor: 'rgba(255,255,255,0.2)'
+                      },
+                      '&:hover fieldset': {
+                        borderColor: 'rgba(255,255,255,0.3)'
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#0891B2'
+                      }
+                    },
+                    '& .MuiInputBase-input::placeholder': {
+                      color: 'rgba(255,255,255,0.5)',
+                      opacity: 1
+                    }
+                  }}
                 />
                 <Button
                   variant="contained"
                   onClick={handleSendMessage}
                   disabled={loading || !inputMessage.trim()}
                   endIcon={<SendIcon />}
+                  sx={{
+                    minWidth: '120px',
+                    background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)',
+                    boxShadow: '0 4px 12px rgba(8, 145, 178, 0.3)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #0D9488 0%, #0891B2 100%)',
+                      boxShadow: '0 6px 16px rgba(8, 145, 178, 0.4)'
+                    },
+                    '&:disabled': {
+                      background: 'rgba(255,255,255,0.1)',
+                      color: 'rgba(255,255,255,0.3)'
+                    }
+                  }}
                 >
                   Send
                 </Button>
@@ -836,45 +1039,65 @@ const HRAssistant = () => {
           {activeTab === 1 && userRole === 'interviewer' && (
             <Box>
               {stats && (
-                <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid container spacing={3} sx={{ mb: 4 }}>
                   <Grid item xs={12} sm={6} md={3}>
-                    <Card>
+                    <Card sx={{
+                      background: 'linear-gradient(135deg, rgba(8, 145, 178, 0.1) 0%, rgba(13, 148, 136, 0.1) 100%)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 2
+                    }}>
                       <CardContent>
-                        <Typography color="text.secondary" gutterBottom>
+                        <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
                           Total Documents
                         </Typography>
-                        <Typography variant="h4">
+                        <Typography variant="h4" sx={{ color: '#0891B2', fontWeight: 700 }}>
                           {stats.database?.total_documents || 0}
                         </Typography>
                       </CardContent>
                     </Card>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
-                    <Card>
+                    <Card sx={{
+                      background: 'linear-gradient(135deg, rgba(8, 145, 178, 0.1) 0%, rgba(13, 148, 136, 0.1) 100%)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 2
+                    }}>
                       <CardContent>
-                        <Typography color="text.secondary" gutterBottom>
+                        <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
                           Vector Chunks
                         </Typography>
-                        <Typography variant="h4">
+                        <Typography variant="h4" sx={{ color: '#0891B2', fontWeight: 700 }}>
                           {stats.vector_store?.total_chunks || 0}
                         </Typography>
                       </CardContent>
                     </Card>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
-                    <Card>
+                    <Card sx={{
+                      background: 'linear-gradient(135deg, rgba(8, 145, 178, 0.1) 0%, rgba(13, 148, 136, 0.1) 100%)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 2
+                    }}>
                       <CardContent>
-                        <Typography color="text.secondary" gutterBottom>
+                        <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
                           Categories
                         </Typography>
-                        <Typography variant="h4">
+                        <Typography variant="h4" sx={{ color: '#0891B2', fontWeight: 700 }}>
                           {Object.keys(stats.database?.categories || {}).length}
                         </Typography>
                       </CardContent>
                     </Card>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
-                    <Card>
+                    <Card sx={{
+                      background: 'linear-gradient(135deg, rgba(8, 145, 178, 0.1) 0%, rgba(13, 148, 136, 0.1) 100%)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 2
+                    }}>
                       <CardContent>
                         <Button
                           fullWidth
@@ -1253,8 +1476,8 @@ const HRAssistant = () => {
             </Button>
           </DialogActions>
         </Dialog>
-      </Box>
     </Container>
+      </Box>
     </>
   );
 };

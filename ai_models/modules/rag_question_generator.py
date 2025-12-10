@@ -16,6 +16,8 @@ try:
     from langchain.chains import RetrievalQA
     from langchain.schema import Document
     import openai
+    
+    print("✅ All imports successful for RAG Question Generator.")
 except ImportError as e:
     print(f"Warning: Some imports failed - {e}. Module will work in proper environment.")
 

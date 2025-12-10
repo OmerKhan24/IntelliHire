@@ -121,14 +121,15 @@ const InterviewReport = () => {
   const downloadReport = async () => {
     try {
       const response = await api.reports.downloadReport(jobId);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `interview-report-${job?.title || 'job'}.pdf`;
+      link.download = `interview-report-${job?.title || 'job'}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       setError('Failed to download report: ' + (err.response?.data?.error || err.message));
     }
