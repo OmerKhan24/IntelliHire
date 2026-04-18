@@ -1,4 +1,6 @@
 import os
+import subprocess
+import sys
 
 # Fix MediaPipe protobuf compatibility issue - MUST be set before ANY imports
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
@@ -62,13 +64,35 @@ def create_app(config_name='development'):
         return jsonify({'error': 'Token has expired'}), 401
     
     # Enhanced CORS configuration - Allow access from network devices
-    CORS(app, 
-         origins=['http://localhost:3000', 'http://192.168.100.80:3000', 'http://127.0.0.1:3000', 'http://192.168.100.80:5000'],
+    _ALLOWED_ORIGINS = [
+        'http://localhost:3000', 'http://127.0.0.1:3000',
+        'http://192.168.100.80:3000', 'http://192.168.100.80:5000',
+        'http://192.168.18.9:3000', 'http://192.168.18.9:5000',
+    ]
+    CORS(app,
+         origins=_ALLOWED_ORIGINS,
          methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
          allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
          expose_headers=['Content-Type', 'Authorization'],
          supports_credentials=True,
-         max_age=3600)  # Cache preflight requests for 1 hour
+         automatic_options=True,
+         max_age=3600)
+
+    # Fallback: guarantee CORS headers on every response (covers JWT 401s, 405s, etc.)
+    @app.after_request
+    def _ensure_cors(response):
+        origin = request.headers.get('Origin', '')
+        if origin in _ALLOWED_ORIGINS:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Vary'] = 'Origin'
+            if request.method == 'OPTIONS':
+                response.headers['Access-Control-Allow-Methods'] = \
+                    'GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH'
+                response.headers['Access-Control-Allow-Headers'] = \
+                    'Content-Type, Authorization, X-Requested-With, Accept'
+                response.headers['Access-Control-Max-Age'] = '3600'
+        return response
     
     # Create upload directory
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -120,19 +144,45 @@ def create_app(config_name='development'):
 if __name__ == '__main__':
     # Get environment configuration
     env = os.environ.get('FLASK_ENV', 'development')
-    
+
+    # Auto-start frontend dev server (only in development, not when pm2 manages it)
+    frontend_process = None
+    if env == 'development' and os.environ.get('NO_FRONTEND') != '1':
+        frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
+        print("🖥️  Starting React frontend...")
+        try:
+            if sys.platform == 'win32':
+                frontend_process = subprocess.Popen(
+                    'npm start',
+                    cwd=frontend_dir,
+                    shell=True,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                )
+            else:
+                frontend_process = subprocess.Popen(
+                    ['npm', 'start'],
+                    cwd=frontend_dir,
+                )
+            print(f"✅ Frontend starting at: http://localhost:3000")
+        except Exception as e:
+            print(f"⚠️  Could not start frontend: {e}")
+
     # Create app
     app = create_app(env)
-    
+
     # Run development server
     print("🚀 Starting IntelliHire API Server...")
     print(f"📡 Server running on: http://localhost:5000")
     print(f"🌐 Frontend URL: http://localhost:3000")
     print(f"🔧 Environment: {env}")
-    
-    app.run(
-        host='0.0.0.0',
-        port=5000,
-        debug=True,
-        use_reloader=False  # Prevent double initialization of services
-    )
+
+    try:
+        app.run(
+            host='0.0.0.0',
+            port=5000,
+            debug=True,
+            use_reloader=False  # Prevent double initialization of services
+        )
+    finally:
+        if frontend_process:
+            frontend_process.terminate()

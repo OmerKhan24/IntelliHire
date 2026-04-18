@@ -6,12 +6,16 @@ import os
 import uuid
 from werkzeug.utils import secure_filename
 
-from models.models import db, Job, Interview, Question, Response, User
+from models.models import db, Job, Interview, Question, Response, User, CandidateReport, CandidateApplication, InterviewSchedule
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
 from services.gemini_service import GeminiService
 from services.github_copilot_service import GitHubCopilotService
 from services.cv_monitoring_service import cv_monitoring_service
+from services.report_generation_service import ReportGenerationService
 from routes.hr_routes import hr_blueprint, init_hr_services
+from routes.application_routes import application_bp, init_application_services
+from routes.admin_routes import admin_bp
+from routes.client_routes import client_bp
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -26,11 +30,12 @@ monitoring_bp = Blueprint('monitoring', __name__, url_prefix='/api/monitoring')
 # Initialize AI services
 gemini_service = None  # For TTS only
 github_copilot_service = None  # For question generation and scoring
+report_gen_service = None  # For rich report generation
 
 
 def init_services(config):
     """Initialize external AI services (Gemini for TTS, DeepSeek for Q&A)"""
-    global gemini_service, github_copilot_service
+    global gemini_service, github_copilot_service, report_gen_service
     try:
         gemini_service = GeminiService()
         logger.info("✅ Google TTS service initialized successfully")
@@ -56,6 +61,20 @@ def init_services(config):
         logger.info("✅ HR services (RAG + Chatbot) initialized successfully")
     except Exception as e:
         logger.warning(f"⚠️ HR services not available: {e}")
+
+    # Initialize report generation service
+    try:
+        report_gen_service = ReportGenerationService()
+        logger.info("✅ Report Generation service initialized successfully")
+    except Exception as e:
+        logger.warning(f"⚠️ Report Generation service not available: {e}")
+
+    # Initialize application / pipeline services
+    try:
+        init_application_services(config)
+        logger.info("✅ Application pipeline services initialized")
+    except Exception as e:
+        logger.warning(f"⚠️ Application pipeline services not available: {e}")
 
 
 
@@ -93,6 +112,9 @@ def register_blueprints(app):
     app.register_blueprint(report_bp)
     app.register_blueprint(monitoring_bp)
     app.register_blueprint(hr_blueprint)  # HR Chatbot & Document Management
+    app.register_blueprint(application_bp)  # Applications & Pipeline
+    app.register_blueprint(admin_bp)  # Admin Panel — Leads, Clients, Payments, Health, SOS
+    app.register_blueprint(client_bp)  # Client Portal — Dashboard, Exports, Sub-accounts
     logger.info("✅ API blueprints registered")
 
 
@@ -148,13 +170,25 @@ def create_job():
             import json
             scoring_criteria = json.dumps(scoring_criteria)
 
+        # Convert must_ask_questions to JSON string if provided
+        must_ask_questions = data.get('must_ask_questions')
+        if must_ask_questions and isinstance(must_ask_questions, list):
+            import json as json_mod
+            must_ask_questions = json_mod.dumps(must_ask_questions)
+
         job = Job(
             title=data['title'],
             description=data['description'],
             requirements=data.get('requirements', ''),
             duration_minutes=data.get('duration_minutes', 20),
             created_by=current_user_id,  # Use JWT identity
-            scoring_criteria=scoring_criteria
+            scoring_criteria=scoring_criteria,
+            must_ask_questions_json=must_ask_questions,
+            max_shortlist=int(data.get('max_shortlist', 5)),
+            max_cv_uploads=int(data.get('max_cv_uploads', 100)),
+            link_active_days=int(data.get('link_active_days', 14)),
+            scheduling_window_days=int(data.get('scheduling_window_days', 7)),
+            max_concurrent_interviews=int(data.get('max_concurrent_interviews', 3)),
         )
         db.session.add(job)
         db.session.commit()
@@ -1362,6 +1396,139 @@ def get_all_reports():
         return jsonify({'success': True, 'interviews': summaries})
     except Exception as e:
         logger.error(f"❌ Failed to get all reports: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# =============== RICH REPORT GENERATION ===============
+@report_bp.route('/generate/<int:interview_id>', methods=['POST', 'OPTIONS'])
+def generate_candidate_report(interview_id):
+    """Generate a rich Flowmingo-style candidate report via DeepSeek."""
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        interview = Interview.query.get(interview_id)
+        if not interview:
+            return jsonify({'error': 'Interview not found'}), 404
+        if interview.status != 'completed':
+            return jsonify({'error': 'Interview not completed yet'}), 400
+
+        # Check if already generated (skip if force=true)
+        force = request.get_json(silent=True) or {}
+        force_regen = force.get('force', False)
+        existing = CandidateReport.query.filter_by(interview_id=interview_id).first()
+        if existing and existing.status == 'completed' and not force_regen:
+            return jsonify({'success': True, 'report': existing.to_dict(), 'cached': True})
+
+        # Create or update report record
+        if not existing:
+            existing = CandidateReport(interview_id=interview_id, report_data={}, status='generating')
+            db.session.add(existing)
+        else:
+            existing.status = 'generating'
+            existing.error_message = None
+        db.session.commit()
+
+        job = Job.query.get(interview.job_id)
+        responses = Response.query.filter_by(interview_id=interview_id).order_by(Response.created_at).all()
+
+        # Parse CV text
+        cv_text = ""
+        if interview.cv_file_path:
+            from utils.cv_parser import extract_text_from_cv
+            cv_text = extract_text_from_cv(interview.cv_file_path) or ""
+
+        # Run async report generation
+        loop = asyncio.new_event_loop()
+        try:
+            report_data = loop.run_until_complete(
+                report_gen_service.generate_report(interview, job, responses, cv_text)
+            )
+        finally:
+            loop.close()
+
+        existing.report_data = report_data
+        existing.status = 'completed'
+        existing.generated_at = datetime.utcnow()
+        db.session.commit()
+
+        logger.info(f"✅ Rich report generated for interview {interview_id}")
+        return jsonify({'success': True, 'report': existing.to_dict(), 'cached': False})
+
+    except Exception as e:
+        logger.error(f"❌ Report generation failed for interview {interview_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        # Mark as failed
+        try:
+            rpt = CandidateReport.query.filter_by(interview_id=interview_id).first()
+            if rpt:
+                rpt.status = 'failed'
+                rpt.error_message = str(e)[:500]
+                db.session.commit()
+        except:
+            pass
+        return jsonify({'error': f'Report generation failed: {str(e)}'}), 500
+
+
+@report_bp.route('/candidate/<int:interview_id>', methods=['GET', 'OPTIONS'])
+def get_candidate_report(interview_id):
+    """Get the stored rich report for a single interview."""
+    if request.method == 'OPTIONS':
+        return '', 200
+    try:
+        report = CandidateReport.query.filter_by(interview_id=interview_id).first()
+        if not report:
+            return jsonify({'error': 'Report not found. Generate it first.', 'status': 'not_found'}), 404
+        return jsonify({'success': True, 'report': report.to_dict()})
+    except Exception as e:
+        logger.error(f"❌ Failed to get candidate report: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@report_bp.route('/compare', methods=['POST', 'OPTIONS'])
+def compare_candidates():
+    """Compare multiple candidates for a job side-by-side."""
+    if request.method == 'OPTIONS':
+        return '', 200
+    try:
+        data = request.get_json()
+        interview_ids = data.get('interview_ids', [])
+        if not interview_ids or len(interview_ids) < 2:
+            return jsonify({'error': 'Provide at least 2 interview_ids'}), 400
+
+        results = []
+        for iid in interview_ids:
+            interview = Interview.query.get(iid)
+            if not interview:
+                continue
+            report = CandidateReport.query.filter_by(interview_id=iid).first()
+            rd = report.report_data if (report and report.status == 'completed') else {}
+
+            results.append({
+                'interview_id': iid,
+                'candidate_name': interview.candidate_name,
+                'candidate_email': interview.candidate_email,
+                'final_score': interview.final_score,
+                'overall_fit_score': rd.get('overall_fit', {}).get('score', 0),
+                'summary': rd.get('overall_fit', {}).get('summary', ''),
+                'strengths': rd.get('overall_fit', {}).get('strengths', []),
+                'gaps': rd.get('overall_fit', {}).get('gaps', []),
+                'rubrics': rd.get('rubrics', []),
+                'communication_skills': rd.get('communication_skills', {}),
+                'cognitive_insights': rd.get('cognitive_insights', {}),
+                'cv_profile_radar': rd.get('cv_profile_radar', {}),
+                'key_attributes': rd.get('key_attributes', {}),
+                'integrity_signals': rd.get('integrity_signals', {}),
+                'vibe_panel': rd.get('vibe_panel', {}),
+                'report_generated': report is not None and report.status == 'completed',
+            })
+
+        # Sort by overall_fit_score descending
+        results.sort(key=lambda x: x['overall_fit_score'], reverse=True)
+        return jsonify({'success': True, 'candidates': results})
+    except Exception as e:
+        logger.error(f"❌ Compare candidates failed: {e}")
         return jsonify({'error': str(e)}), 500
 
 

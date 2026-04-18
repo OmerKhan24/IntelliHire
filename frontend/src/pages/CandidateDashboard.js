@@ -1,49 +1,39 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
-  Container,
-  Typography,
-  Box,
-  Card,
-  CardContent,
-  Grid,
-  Chip,
-  Button,
-  CircularProgress,
-  Alert,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  alpha,
-  Fade,
-  Zoom,
-  AppBar,
-  Toolbar,
-  IconButton
+  Container, Typography, Box, Card, CardContent, Grid, Chip, Button,
+  CircularProgress, Alert, IconButton, Divider, LinearProgress,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
   Work as WorkIcon,
   PlayArrow as StartIcon,
-  Description as DescriptionIcon,
   Schedule as ScheduleIcon,
   CheckCircle as CompletedIcon,
   HourglassEmpty as PendingIcon,
   Assessment as ReportIcon,
-  Upload as UploadIcon,
-  ArrowBack as BackIcon,
-  CloudUpload as CloudUploadIcon
+  CloudUpload as UploadIcon,
+  Logout as LogoutIcon,
+  CalendarMonth as CalendarIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 
+/* ── Design Tokens (matches landing page dark theme) ── */
+const C = {
+  primary: '#2f97f7', accent: '#0ea5e9', bg: '#0b1120',
+  bgCard: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)',
+  text: '#e2e8f0', textMuted: '#94a3b8', textDim: '#64748b',
+  success: '#10b981', warning: '#f59e0b', error: '#ef4444',
+};
+const glassCard = {
+  background: C.bgCard, backdropFilter: 'blur(24px)',
+  border: `1px solid ${C.border}`, borderRadius: '16px',
+};
+
 const CandidateDashboard = () => {
+  const [myApplications, setMyApplications] = useState([]);
   const [myInterviews, setMyInterviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -52,573 +42,313 @@ const CandidateDashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  useEffect(() => { loadDashboardData(); }, []);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      
-      // Get candidate email from localStorage (set when they access an interview link)
+      // Load candidate applications
+      try {
+        const appRes = await api.applications.myApplications();
+        setMyApplications(appRes.data.applications || []);
+      } catch { setMyApplications([]); }
+
+      // Load interviews
       const candidateEmail = localStorage.getItem('candidate_email');
-      
       if (candidateEmail) {
         try {
-          const interviewsResponse = await api.interviews.getMy(candidateEmail);
-          setMyInterviews(interviewsResponse.data.interviews || []);
-        } catch (err) {
-          console.error('Failed to load interviews:', err);
-          setMyInterviews([]);
-        }
-      } else {
-        // No email in localStorage - candidate hasn't accessed any interview yet
-        setMyInterviews([]);
+          const ivRes = await api.interviews.getMy(candidateEmail);
+          setMyInterviews(ivRes.data.interviews || []);
+        } catch { setMyInterviews([]); }
       }
     } catch (err) {
-      setError('Failed to load dashboard: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setLoading(false);
-    }
+      setError('Failed to load dashboard');
+    } finally { setLoading(false); }
   };
 
   const handleUploadCV = async () => {
-    if (!cvFile) {
-      setError('Please select a CV file');
-      return;
-    }
-
+    if (!cvFile) return;
     try {
       setUploadLoading(true);
-      const formData = new FormData();
-      formData.append('cv', cvFile);
-      
-      await api.candidate.uploadCV(formData);
-      alert('CV uploaded successfully!');
+      const fd = new FormData();
+      fd.append('cv', cvFile);
+      await api.candidate.uploadCV(fd);
       setCvFile(null);
     } catch (err) {
-      setError('Failed to upload CV: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setUploadLoading(false);
-    }
+      setError('Failed to upload CV');
+    } finally { setUploadLoading(false); }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'completed':
-        return <CompletedIcon color="success" />;
-      case 'in_progress':
-        return <PendingIcon color="warning" />;
-      default:
-        return <ScheduleIcon color="disabled" />;
-    }
+  const statusColor = (s) => {
+    const map = {
+      applied: C.primary, scoring: C.warning, scored: C.warning,
+      shortlisted: C.success, rejected: C.error, scheduled: C.accent,
+      interviewed: C.success, hired: '#a78bfa',
+    };
+    return map[s] || C.textDim;
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (d) =>
+    d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
   if (loading) {
     return (
-      <Box 
-        display="flex" 
-        justifyContent="center" 
-        alignItems="center" 
-        minHeight="100vh"
-        sx={{
-          background: 'linear-gradient(135deg, #0A192F 0%, #1E3A5F 50%, #0891B2 100%)',
-        }}
-      >
+      <Box sx={{ minHeight: '100vh', bgcolor: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box sx={{ textAlign: 'center' }}>
-          <CircularProgress size={60} sx={{ color: '#5EEAD4', mb: 2 }} />
-          <Typography sx={{ color: '#fff', fontWeight: 500 }}>Loading your dashboard...</Typography>
+          <CircularProgress size={50} sx={{ color: C.primary, mb: 2 }} />
+          <Typography sx={{ color: C.textMuted }}>Loading dashboard...</Typography>
         </Box>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ 
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #F9FAFB 0%, #E5E7EB 100%)',
-      position: 'relative',
-      pb: 6,
-      '&::before': {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '280px',
-        background: 'linear-gradient(135deg, #0A192F 0%, #1E3A5F 50%, #0891B2 100%)',
-        zIndex: 0,
-      }
-    }}>
-      {/* Navigation Bar */}
-      <AppBar 
-        position="sticky"
-        elevation={0}
-        sx={{
-          background: 'rgba(10, 25, 47, 0.9)',
-          backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        }}
-      >
-        <Toolbar>
-          <WorkIcon sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700 }}>
-            My Dashboard
-          </Typography>
-          <Chip 
-            label={user?.username}
-            sx={{ 
-              background: 'rgba(94, 234, 212, 0.15)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(94, 234, 212, 0.3)',
-              color: '#5EEAD4',
-              fontWeight: 600,
-              mr: 1
-            }}
-          />
-          <Button 
-            variant="outlined"
-            size="small"
-            onClick={async () => {
-              await logout();
-              navigate('/login');
-            }}
-            sx={{
-              borderColor: 'rgba(255, 255, 255, 0.3)',
-              color: '#fff',
-              '&:hover': {
-                borderColor: 'rgba(255, 255, 255, 0.5)',
-                background: 'rgba(255, 255, 255, 0.05)'
-              }
-            }}
-          >
-            Logout
-          </Button>
-        </Toolbar>
-      </AppBar>
+    <Box sx={{ minHeight: '100vh', bgcolor: C.bg, position: 'relative' }}>
+      {/* Ambient glow */}
+      <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+        <Box sx={{ position: 'absolute', top: '10%', left: '5%', width: 500, height: 500, borderRadius: '50%', background: alpha(C.primary, 0.03), filter: 'blur(120px)' }} />
+        <Box sx={{ position: 'absolute', bottom: '20%', right: '10%', width: 400, height: 400, borderRadius: '50%', background: alpha(C.accent, 0.025), filter: 'blur(100px)' }} />
+      </Box>
 
-      <Container maxWidth="lg" sx={{ mt: 5, position: 'relative', zIndex: 1 }}>
-        {/* Welcome Header */}
-        <Fade in timeout={800}>
-          <Box 
-            className="glass-card-white"
-            sx={{ 
-              mb: 4, 
-              p: 4,
-              borderRadius: 4,
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(20px)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.5)',
-            }}
-          >
-            <Typography 
-              variant="h3" 
-              gutterBottom
-              sx={{
-                fontWeight: 800,
-                background: 'linear-gradient(135deg, #0A192F 0%, #0891B2 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                mb: 1,
-              }}
-            >
-              Welcome Back, {user?.username}! 👋
-            </Typography>
-            <Typography 
-              variant="body1"
-              sx={{
-                color: 'text.secondary',
-                fontSize: '1.1rem',
-                fontWeight: 500
-              }}
-            >
-              Browse available positions and track your interview progress
-            </Typography>
-          </Box>
-        </Fade>
+      {/* Top bar */}
+      <Box sx={{
+        px: 4, py: 2, display: 'flex', alignItems: 'center', gap: 2,
+        borderBottom: `1px solid ${C.border}`, bgcolor: 'rgba(0,0,0,0.3)',
+        backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 10,
+      }}>
+        <PersonIcon sx={{ color: C.primary }} />
+        <Typography sx={{ color: C.text, fontWeight: 700, fontSize: '1.1rem', flex: 1 }}>
+          Candidate Portal
+        </Typography>
+        <Chip
+          label={user?.username || user?.full_name || 'Candidate'}
+          size="small"
+          sx={{
+            background: alpha(C.primary, 0.15), color: C.primary,
+            fontWeight: 700, border: `1px solid ${alpha(C.primary, 0.3)}`,
+          }}
+        />
+        <IconButton size="small" onClick={async () => { await logout(); navigate('/login'); }}
+          sx={{ color: C.textMuted, '&:hover': { color: C.error } }}>
+          <LogoutIcon fontSize="small" />
+        </IconButton>
+      </Box>
+
+      <Container maxWidth="lg" sx={{ py: 5, position: 'relative', zIndex: 1 }}>
+        {/* Welcome */}
+        <Box sx={{ mb: 5 }}>
+          <Typography sx={{ color: C.text, fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.02em' }}>
+            Welcome back, {user?.full_name || user?.username} 👋
+          </Typography>
+          <Typography sx={{ color: C.textMuted, mt: 0.5 }}>
+            Track your applications, schedule interviews, and view results
+          </Typography>
+        </Box>
 
         {error && (
-          <Zoom in>
-            <Alert 
-              severity="error" 
-              sx={{ 
-                mb: 3,
-                borderRadius: 3,
-                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)',
-              }} 
-              onClose={() => setError('')}
-            >
-              {error}
-            </Alert>
-          </Zoom>
+          <Alert severity="error" onClose={() => setError('')}
+            sx={{ mb: 3, bgcolor: alpha(C.error, 0.1), color: C.error, border: `1px solid ${alpha(C.error, 0.3)}`, '& .MuiAlert-icon': { color: C.error } }}>
+            {error}
+          </Alert>
         )}
 
-        {/* CV Upload Section */}
-        <Zoom in timeout={1000}>
-          <Card 
-            className="hover-lift"
-            sx={{ 
-              mb: 4,
-              borderRadius: 4,
-              background: 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
-              color: 'white',
-              border: 'none',
-              position: 'relative',
-              overflow: 'hidden',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: -100,
-                right: -100,
-                width: 250,
-                height: 250,
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.1)',
-              }
-            }}
-          >
-            
-          
-            <CardContent sx={{ p: 4, position: 'relative', zIndex: 1 }}>
-              <Box display="flex" alignItems="center" gap={2} mb={3}>
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 3,
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    backdropFilter: 'blur(10px)',
-                  }}
-                >
-                  <CloudUploadIcon sx={{ fontSize: 40 }} />
+        {/* Stats row */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {[
+            { label: 'Applications', value: myApplications.length, color: C.primary, icon: <WorkIcon /> },
+            { label: 'Shortlisted', value: myApplications.filter(a => a.status === 'shortlisted').length, color: C.success, icon: <CompletedIcon /> },
+            { label: 'Interviews', value: myInterviews.length, color: C.accent, icon: <CalendarIcon /> },
+            { label: 'Completed', value: myInterviews.filter(i => i.status === 'completed').length, color: '#a78bfa', icon: <ReportIcon /> },
+          ].map(({ label, value, color, icon }) => (
+            <Grid item xs={6} md={3} key={label}>
+              <Card sx={{ ...glassCard, p: 2.5, borderLeft: `3px solid ${color}` }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{ color, opacity: 0.8 }}>{icon}</Box>
+                  <Box>
+                    <Typography sx={{ color: C.text, fontWeight: 800, fontSize: '1.5rem', lineHeight: 1 }}>{value}</Typography>
+                    <Typography sx={{ color: C.textDim, fontSize: '0.75rem', mt: 0.3 }}>{label}</Typography>
+                  </Box>
                 </Box>
-                <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-                    Upload Your CV
-                  </Typography>
-                  <Typography sx={{ opacity: 0.9 }}>
-                    Keep your resume updated for better opportunities
-                  </Typography>
-                </Box>
-              </Box>
-              
-              <Box display="flex" gap={2} alignItems="center">
-                <input
-                  accept=".pdf,.doc,.docx"
-                  style={{ display: 'none' }}
-                  id="cv-upload"
-                  type="file"
-                  onChange={(e) => setCvFile(e.target.files[0])}
-                />
-                <label htmlFor="cv-upload" style={{ flex: 1 }}>
-                  <Button
-                    variant="contained"
-                    component="span"
-                    fullWidth
-                    sx={{
-                      py: 1.5,
-                      background: 'rgba(255, 255, 255, 0.9)',
-                      color: '#0D9488',
-                      fontWeight: 600,
-                      borderRadius: 2,
-                      '&:hover': {
-                        background: '#fff',
-                      }
-                    }}
-                  >
-                    {cvFile ? cvFile.name : 'Choose File'}
-                  </Button>
-                </label>
-                
-                <Button
-                  variant="outlined"
-                  startIcon={<UploadIcon />}
-                  onClick={handleUploadCV}
-                  disabled={!cvFile || uploadLoading}
-                  sx={{
-                    py: 1.5,
-                    px: 3,
-                    borderColor: 'rgba(255, 255, 255, 0.5)',
-                    color: '#fff',
-                    fontWeight: 600,
-                    borderRadius: 2,
-                    '&:hover': {
-                      borderColor: '#fff',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                    }
-                  }}
-                >
-                  {uploadLoading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : 'Upload'}
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* CV Upload */}
+        <Card sx={{ ...glassCard, mb: 4, background: `linear-gradient(135deg, ${alpha(C.primary, 0.08)}, ${alpha(C.accent, 0.05)})`, border: `1px solid ${alpha(C.primary, 0.2)}` }}>
+          <CardContent sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+            <Box sx={{ width: 48, height: 48, borderRadius: '12px', background: `linear-gradient(135deg, ${C.primary}, ${C.accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <UploadIcon sx={{ color: '#fff', fontSize: 24 }} />
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 200 }}>
+              <Typography sx={{ color: C.text, fontWeight: 700, fontSize: '1rem' }}>Upload Your CV</Typography>
+              <Typography sx={{ color: C.textMuted, fontSize: '0.85rem' }}>Keep your resume updated for better opportunities</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <input accept=".pdf,.doc,.docx" style={{ display: 'none' }} id="cv-upload" type="file"
+                onChange={(e) => setCvFile(e.target.files[0])} />
+              <label htmlFor="cv-upload">
+                <Button component="span" variant="outlined"
+                  sx={{ borderColor: alpha(C.primary, 0.4), color: C.text, textTransform: 'none', borderRadius: '10px', '&:hover': { borderColor: C.primary, bgcolor: alpha(C.primary, 0.08) } }}>
+                  {cvFile ? cvFile.name : 'Choose File'}
                 </Button>
-              </Box>
-            </CardContent>
-          </Card>
-        </Zoom>
-
-        {/* My Interviews Section */}
-        <Zoom in timeout={1200}>
-          <Card sx={{ 
-            mb: 4,
-            background: alpha('#fff', 0.15),
-            backdropFilter: 'blur(20px)',
-            border: `1px solid ${alpha('#fff', 0.2)}`,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
-          }}>
-            <CardContent>
-              <Typography variant="h5" gutterBottom sx={{ color: '#fff', fontWeight: 700 }}>
-                📋 My Interviews
-              </Typography>
-              
-              {myInterviews.length === 0 ? (
-                <Box 
-                  sx={{ 
-                    textAlign: 'center', 
-                    py: 8,
-                    background: 'linear-gradient(135deg, rgba(8, 145, 178, 0.05) 0%, rgba(13, 148, 136, 0.05) 100%)',
-                    borderRadius: 3,
-                    border: `2px dashed ${alpha('#0891B2', 0.3)}`,
-                    position: 'relative',
-                    overflow: 'hidden',
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: -50,
-                      right: -50,
-                      width: 100,
-                      height: 100,
-                      borderRadius: '50%',
-                      background: 'radial-gradient(circle, rgba(8, 145, 178, 0.2) 0%, transparent 70%)',
-                      animation: 'pulse-glow 3s ease-in-out infinite'
-                    }
-                  }}
-                >
-                  <Typography 
-                    variant="h5" 
-                    sx={{ 
-                      color: '#0891B2',
-                      fontWeight: 700,
-                      mb: 2,
-                      textShadow: '0 2px 10px rgba(8, 145, 178, 0.3)'
-                    }}
-                  >
-                    📬 No Interviews Yet
-                  </Typography>
-                  <Typography 
-                    variant="body1" 
-                    sx={{ 
-                      color: "black",
-                      maxWidth: 400,
-                      mx: 'auto'
-                    }}
-                  >
-                    You'll receive interview invitations from recruiters via email
-                  </Typography>
-                </Box>
-              ) : (
-                <List sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {myInterviews.map((interview, idx) => (
-                    <Fade in timeout={800 + idx * 100} key={interview.id}>
-                      <ListItem
-                        className="hover-lift"
-                        sx={{
-                          borderRadius: 3,
-                          background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.08) 100%)',
-                          backdropFilter: 'blur(20px)',
-                          border: `1px solid ${alpha('#0891B2', 0.2)}`,
-                          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          transition: 'all 0.3s ease',
-                          '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: 4,
-                            height: '100%',
-                            background: interview.status === 'completed' 
-                              ? 'linear-gradient(180deg, #0891B2 0%, #0D9488 100%)'
-                              : interview.status === 'in_progress'
-                              ? 'linear-gradient(180deg, #D97706 0%, #F59E0B 100%)'
-                              : 'linear-gradient(180deg, #64748B 0%, #94A3B8 100%)'
-                          },
-                          '&:hover': {
-                            background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.1) 100%)',
-                            borderColor: alpha('#0891B2', 0.4),
-                            boxShadow: '0 8px 30px rgba(8, 145, 178, 0.2)'
-                          }
-                        }}
-                        secondaryAction={
-                          interview.status === 'completed' ? (
-                            <Button
-                              size="small"
-                              startIcon={<ReportIcon />}
-                              onClick={() => navigate(`/report/interview/${interview.id}`)}
-                              sx={{
-                                background: 'linear-gradient(135deg, #0891B2 0%, #06B6D4 100%)',
-                                color: '#fff',
-                                fontWeight: 600,
-                                px: 3,
-                                py: 1,
-                                borderRadius: 2,
-                                textTransform: 'none',
-                                boxShadow: '0 4px 15px rgba(8, 145, 178, 0.3)',
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                  background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
-                                  transform: 'translateY(-2px)',
-                                  boxShadow: '0 6px 20px rgba(8, 145, 178, 0.4)'
-                                }
-                              }}
-                            >
-                              View Report
-                            </Button>
-                          ) : (
-                            <Chip
-                              label={interview.status.replace('_', ' ').toUpperCase()}
-                              size="small"
-                              sx={{ 
-                                background: interview.status === 'in_progress'
-                                  ? 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)'
-                                  : alpha('#64748B', 0.3),
-                                color: '#fff',
-                                fontWeight: 600,
-                                px: 1.5,
-                                borderRadius: 2,
-                                border: `1px solid ${alpha('#fff', 0.2)}`
-                              }}
-                            />
-                          )
-                        }
-                      >
-                        <ListItemIcon 
-                          sx={{ 
-                            color: '#0891B2',
-                            fontSize: 32,
-                            minWidth: 48
-                          }}
-                        >
-                          {getStatusIcon(interview.status)}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={interview.job?.title || 'Interview'}
-                          secondary={
-                            <>
-                              {interview.job?.company && `${interview.job.company} • `}
-                              {interview.status === 'pending' && interview.accessed_at && `Accessed: ${formatDate(interview.accessed_at)}`}
-                              {interview.status === 'in_progress' && interview.started_at && `Started: ${formatDate(interview.started_at)}`}
-                              {interview.status === 'completed' && interview.completed_at && `Completed: ${formatDate(interview.completed_at)}`}
-                              {interview.final_score && ` • Score: ${interview.final_score.toFixed(1)}%`}
-                            </>
-                          }
-                          sx={{
-                            '& .MuiListItemText-primary': { 
-                              color: '#fff',
-                              fontWeight: 700,
-                              fontSize: '1.1rem',
-                              mb: 0.5
-                            },
-                            '& .MuiListItemText-secondary': { 
-                              color: alpha('#fff', 0.7),
-                              fontSize: '0.9rem'
-                            }
-                          }}
-                        />
-                      </ListItem>
-                    </Fade>
-                  ))}
-                </List>
-              )}
-            </CardContent>
-          </Card>
-        </Zoom>
-
-        {/* Information Card */}
-        <Zoom in timeout={1400}>
-          <Card sx={{ 
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.08) 100%)',
-            backdropFilter: 'blur(20px)',
-            border: `1px solid ${alpha('#0891B2', 0.3)}`,
-            boxShadow: '0 8px 32px rgba(8, 145, 178, 0.15)',
-            position: 'relative',
-            overflow: 'hidden',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: -100,
-              right: -100,
-              width: 200,
-              height: 200,
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(8, 145, 178, 0.15) 0%, transparent 70%)',
-              animation: 'pulse-glow 4s ease-in-out infinite'
-            }
-          }}>
-            <CardContent sx={{ p: 4, textAlign: 'center', position: 'relative', zIndex: 1 }}>
-              <Box
+              </label>
+              <Button variant="contained" onClick={handleUploadCV} disabled={!cvFile || uploadLoading}
                 sx={{
-                  display: 'inline-block',
-                  p: 3,
-                  borderRadius: 3,
-                  background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)',
-                  boxShadow: '0 8px 24px rgba(8, 145, 178, 0.3)',
-                  mb: 3,
-                  animation: 'float 3s ease-in-out infinite'
-                }}
-              >
-                <DescriptionIcon sx={{ fontSize: 60, color: '#fff' }} />
-              </Box>
-              <Typography 
-                variant="h5" 
-                gutterBottom 
-                sx={{ 
-                  color: '#fff',
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #0891B2 0%, #0D9488 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  mb: 2
-                }}
-              >
-                📧 How to Start an Interview
-              </Typography>
-              <Typography 
-                variant="body1" 
-                sx={{ 
-                  color: "black",
-                  mb: 2,
-                  fontWeight: 500,
-                  lineHeight: 1.6
-                }}
-              >
-                Recruiters will send you interview links via email. Click the link to start your AI-powered interview.
-              </Typography>
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  color: alpha('#fff', 0.7),
-                  lineHeight: 1.6
-                }}
-              >
-                Make sure you have a working webcam and microphone for the best interview experience.
-              </Typography>
-            </CardContent>
-          </Card>
-        </Zoom>
-      </Container>
+                  background: `linear-gradient(135deg, ${C.primary}, ${C.accent})`, color: '#fff',
+                  fontWeight: 700, borderRadius: '10px', textTransform: 'none',
+                  '&:disabled': { background: 'rgba(255,255,255,0.06)', color: C.textDim },
+                }}>
+                {uploadLoading ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : 'Upload'}
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
 
-      {/* Job Details Dialog - Removed as candidates access via links only */}
+        {/* My Applications */}
+        <Typography sx={{ color: C.text, fontWeight: 700, fontSize: '1.2rem', mb: 2 }}>
+          📋 My Applications
+        </Typography>
+
+        {myApplications.length === 0 ? (
+          <Card sx={{ ...glassCard, p: 5, mb: 4, textAlign: 'center' }}>
+            <WorkIcon sx={{ fontSize: 48, color: C.textDim, mb: 1 }} />
+            <Typography sx={{ color: C.text, fontWeight: 600, mb: 0.5 }}>No Applications Yet</Typography>
+            <Typography sx={{ color: C.textMuted, fontSize: '0.9rem' }}>
+              Apply to jobs via shared links from recruiters
+            </Typography>
+          </Card>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}>
+            {myApplications.map((app) => (
+              <Card key={app.id} sx={{
+                ...glassCard, p: 0, overflow: 'hidden',
+                transition: 'all 0.3s ease',
+                '&:hover': { borderColor: alpha(C.primary, 0.3), transform: 'translateY(-2px)', boxShadow: `0 8px 30px ${alpha(C.primary, 0.12)}` },
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+                  {/* Status bar */}
+                  <Box sx={{ width: 4, background: statusColor(app.status), flexShrink: 0 }} />
+                  <CardContent sx={{ flex: 1, p: 2.5, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                    <Box sx={{ flex: 1, minWidth: 200 }}>
+                      <Typography sx={{ color: C.text, fontWeight: 700, fontSize: '1rem' }}>
+                        {app.job_title || 'Position'}
+                      </Typography>
+                      <Typography sx={{ color: C.textDim, fontSize: '0.8rem', mt: 0.3 }}>
+                        {app.company_name && `${app.company_name} · `}Applied {formatDate(app.applied_at)}
+                        {app.ats_score != null && ` · ATS: ${app.ats_score.toFixed(0)}%`}
+                      </Typography>
+                    </Box>
+                    <Chip label={app.status.replace(/_/g, ' ').toUpperCase()} size="small"
+                      sx={{ fontWeight: 700, fontSize: '0.7rem', background: alpha(statusColor(app.status), 0.15), color: statusColor(app.status), border: `1px solid ${alpha(statusColor(app.status), 0.3)}` }} />
+
+                    {/* Action buttons based on status */}
+                    {app.status === 'shortlisted' && (
+                      <Button size="small" variant="contained" startIcon={<CalendarIcon />}
+                        onClick={() => navigate(`/schedule/${app.id}`)}
+                        sx={{
+                          background: `linear-gradient(135deg, ${C.success}, #34d399)`, color: '#fff',
+                          fontWeight: 700, borderRadius: '10px', textTransform: 'none', fontSize: '0.8rem',
+                        }}>
+                        Schedule Interview
+                      </Button>
+                    )}
+                    {app.status === 'scheduled' && (
+                      <Button size="small" variant="outlined" startIcon={<ScheduleIcon />}
+                        onClick={() => navigate(`/schedule/${app.id}`)}
+                        sx={{
+                          borderColor: alpha(C.accent, 0.4), color: C.accent,
+                          fontWeight: 600, borderRadius: '10px', textTransform: 'none', fontSize: '0.8rem',
+                          '&:hover': { borderColor: C.accent, bgcolor: alpha(C.accent, 0.08) },
+                        }}>
+                        View Schedule
+                      </Button>
+                    )}
+                  </CardContent>
+                </Box>
+              </Card>
+            ))}
+          </Box>
+        )}
+
+        {/* My Interviews */}
+        <Typography sx={{ color: C.text, fontWeight: 700, fontSize: '1.2rem', mb: 2 }}>
+          🎤 My Interviews
+        </Typography>
+
+        {myInterviews.length === 0 ? (
+          <Card sx={{ ...glassCard, p: 5, textAlign: 'center' }}>
+            <CalendarIcon sx={{ fontSize: 48, color: C.textDim, mb: 1 }} />
+            <Typography sx={{ color: C.text, fontWeight: 600, mb: 0.5 }}>No Interviews Yet</Typography>
+            <Typography sx={{ color: C.textMuted, fontSize: '0.9rem' }}>
+              Once you're shortlisted, you'll be invited to schedule your AI interview
+            </Typography>
+          </Card>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {myInterviews.map((iv) => {
+              const isCompleted = iv.status === 'completed';
+              const isPending = iv.status === 'pending';
+              return (
+                <Card key={iv.id} sx={{
+                  ...glassCard, p: 0, overflow: 'hidden',
+                  transition: 'all 0.3s ease',
+                  '&:hover': { borderColor: alpha(isCompleted ? C.success : C.primary, 0.3), transform: 'translateY(-2px)' },
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+                    <Box sx={{
+                      width: 4, flexShrink: 0,
+                      background: isCompleted ? `linear-gradient(180deg, ${C.success}, #34d399)` : iv.status === 'in_progress' ? `linear-gradient(180deg, ${C.warning}, #fbbf24)` : C.textDim,
+                    }} />
+                    <CardContent sx={{ flex: 1, p: 2.5, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                      <Box sx={{ flex: 1, minWidth: 200 }}>
+                        <Typography sx={{ color: C.text, fontWeight: 700 }}>
+                          {iv.job?.title || 'Interview'}
+                        </Typography>
+                        <Typography sx={{ color: C.textDim, fontSize: '0.8rem', mt: 0.3 }}>
+                          {iv.job?.company && `${iv.job.company} · `}
+                          {isPending && iv.accessed_at && `Accessed: ${formatDate(iv.accessed_at)}`}
+                          {iv.status === 'in_progress' && iv.started_at && `Started: ${formatDate(iv.started_at)}`}
+                          {isCompleted && iv.completed_at && `Completed: ${formatDate(iv.completed_at)}`}
+                          {iv.final_score != null && ` · Score: ${iv.final_score.toFixed(1)}%`}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={iv.status.replace(/_/g, ' ').toUpperCase()} size="small"
+                        sx={{
+                          fontWeight: 700, fontSize: '0.7rem',
+                          background: isCompleted ? alpha(C.success, 0.15) : iv.status === 'in_progress' ? alpha(C.warning, 0.15) : alpha(C.textDim, 0.15),
+                          color: isCompleted ? C.success : iv.status === 'in_progress' ? C.warning : C.textDim,
+                          border: `1px solid ${alpha(isCompleted ? C.success : iv.status === 'in_progress' ? C.warning : C.textDim, 0.3)}`,
+                        }}
+                      />
+                      {isCompleted && (
+                        <Button size="small" variant="contained" startIcon={<ReportIcon />}
+                          onClick={() => navigate(`/feedback/${iv.id}`)}
+                          sx={{
+                            background: `linear-gradient(135deg, ${C.primary}, ${C.accent})`, color: '#fff',
+                            fontWeight: 700, borderRadius: '10px', textTransform: 'none', fontSize: '0.8rem',
+                            '&:hover': { transform: 'translateY(-1px)', boxShadow: `0 4px 15px ${alpha(C.primary, 0.3)}` },
+                          }}>
+                          View Report
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Box>
+                </Card>
+              );
+            })}
+          </Box>
+        )}
+
+        {/* Info */}
+        <Card sx={{ ...glassCard, mt: 4, p: 3, textAlign: 'center', background: alpha(C.primary, 0.04), border: `1px solid ${alpha(C.primary, 0.15)}` }}>
+          <Typography sx={{ color: C.text, fontWeight: 700, mb: 1 }}>📧 How It Works</Typography>
+          <Typography sx={{ color: C.textMuted, fontSize: '0.9rem', maxWidth: 500, mx: 'auto' }}>
+            Apply through shared job links → Get shortlisted by AI screening → Schedule your interview → Complete the AI interview → View your results
+          </Typography>
+        </Card>
+      </Container>
     </Box>
   );
 };

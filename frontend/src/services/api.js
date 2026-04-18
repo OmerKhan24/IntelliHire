@@ -51,6 +51,11 @@ export const api = {
     downloadReport: (jobId) => apiClient.get(`/api/reports/job/${jobId}/download`, {
       responseType: 'blob'
     }),
+    generateCandidateReport: (interviewId, force = false) => apiClient.post(`/api/reports/generate/${interviewId}`, { force }, {
+      timeout: 180000  // 3 minutes for DeepSeek calls
+    }),
+    getCandidateReport: (interviewId) => apiClient.get(`/api/reports/candidate/${interviewId}`),
+    compareCandidates: (interviewIds) => apiClient.post('/api/reports/compare', { interview_ids: interviewIds }),
   },
   // Auth
   auth: {
@@ -116,7 +121,122 @@ export const api = {
       params: { category } 
     }),
     submitFeedback: (feedbackData) => apiClient.post('/api/hr/chat/feedback', feedbackData)
-  }
+  },
+
+  // Applications & Pipeline
+  applications: {
+    // Public — get job by share token
+    getPublicJob: (shareToken) => apiClient.get(`/api/applications/job/${shareToken}`),
+    // Public — submit application (multipart form)
+    apply: (formData) => apiClient.post('/api/applications/apply', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000
+    }),
+    // Interviewer — list applications for a job
+    listForJob: (jobId, status) => apiClient.get(`/api/applications/job/${jobId}`, { params: { status } }),
+    // Interviewer — trigger ATS scoring
+    scoreAll: (jobId) => apiClient.post(`/api/applications/score/${jobId}`, {}, { timeout: 300000 }),
+    // Interviewer — shortlist top N
+    shortlist: (jobId, maxShortlist) => apiClient.post(`/api/applications/shortlist/${jobId}`, { max_shortlist: maxShortlist }),
+    // Interviewer — schedule interviews
+    schedule: (jobId, startTime, gapMinutes) => apiClient.post(`/api/applications/schedule/${jobId}`, {
+      start_time: startTime, gap_minutes: gapMinutes
+    }),
+    // Interviewer — run full pipeline
+    runPipeline: (jobId) => apiClient.post(`/api/applications/pipeline/${jobId}`, {}, { timeout: 600000 }),
+    // Interviewer — publish/unpublish job
+    publish: (jobId, data) => apiClient.post(`/api/applications/publish/${jobId}`, data),
+    // Candidate — my applications
+    myApplications: () => apiClient.get('/api/applications/my'),
+    // Notifications
+    getNotifications: () => apiClient.get('/api/applications/notifications'),
+    markNotificationsRead: (ids) => apiClient.post('/api/applications/notifications/read', { ids }),
+    // Email logs
+    getEmailLogs: (jobId) => apiClient.get(`/api/applications/emails/${jobId}`),
+    // Candidate self-scheduling
+    getAvailableSlots: (applicationId) => apiClient.get(`/api/applications/slots/${applicationId}`),
+    bookSlot: (applicationId, slotStart) => apiClient.post('/api/applications/book-slot', {
+      application_id: applicationId, slot_start: slotStart,
+    }),
+    reschedule: (scheduleId, newSlotStart) => apiClient.post('/api/applications/reschedule', {
+      schedule_id: scheduleId, new_slot_start: newSlotStart,
+    }),
+    getMySchedule: (applicationId) => apiClient.get(`/api/applications/my-schedule/${applicationId}`),
+    // Trigger reminders (called by cron or manually)
+    sendReminders: () => apiClient.post('/api/applications/send-reminders'),
+  },
+
+  // ─── Client Portal ─────────────────────────────────────
+  clientPortal: {
+    getDashboard: () => apiClient.get('/api/client/dashboard'),
+    getProfile: () => apiClient.get('/api/client/profile'),
+    updateProfile: (data) => apiClient.put('/api/client/profile', data),
+    changePassword: (data) => apiClient.post('/api/client/change-password', data),
+    // Sub-accounts
+    getSubAccounts: () => apiClient.get('/api/client/sub-accounts'),
+    createSubAccount: (data) => apiClient.post('/api/client/sub-accounts', data),
+    removeSubAccount: (id) => apiClient.delete(`/api/client/sub-accounts/${id}`),
+    // Preferences
+    getPreferences: () => apiClient.get('/api/client/preferences'),
+    updatePreferences: (data) => apiClient.put('/api/client/preferences', data),
+    // Branding
+    updateBranding: (formData) => apiClient.put('/api/client/branding', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+    // Must-ask questions
+    getMustAskQuestions: (jobId) => apiClient.get('/api/client/must-ask-questions', { params: jobId ? { job_id: jobId } : {} }),
+    addMustAskQuestion: (data) => apiClient.post('/api/client/must-ask-questions', data),
+    deleteMustAskQuestion: (id) => apiClient.delete(`/api/client/must-ask-questions/${id}`),
+    // Exports
+    exportCandidatePdf: (candidateId) => apiClient.get(`/api/client/export/candidate/${candidateId}/pdf`, { responseType: 'blob' }),
+    exportCandidatesCsv: (jobId) => apiClient.get(`/api/client/export/candidates/${jobId}/csv`, { responseType: 'blob' }),
+    exportCandidatesZip: (jobId) => apiClient.get(`/api/client/export/candidates/${jobId}/zip`, { responseType: 'blob', timeout: 120000 }),
+    exportUsage: () => apiClient.get('/api/client/export/usage', { responseType: 'blob' }),
+    // Jobs
+    getJobs: () => apiClient.get('/api/client/jobs'),
+    getJobCandidates: (jobId) => apiClient.get(`/api/client/jobs/${jobId}/candidates`),
+  },
+
+  // ─── Admin Panel (SaaS flow) ───────────────────────────
+  adminPanel: {
+    // Dashboard overview
+    getDashboard: () => apiClient.get('/api/admin/dashboard'),
+    // Leads
+    getLeads: (status) => apiClient.get('/api/admin/leads', { params: status ? { status } : {} }),
+    getLead: (id) => apiClient.get(`/api/admin/leads/${id}`),
+    updateLead: (id, data) => apiClient.put(`/api/admin/leads/${id}`, data),
+    confirmLead: (id, data) => apiClient.post(`/api/admin/leads/${id}/confirm`, data),
+    // Clients
+    getClients: () => apiClient.get('/api/admin/clients'),
+    getClient: (id) => apiClient.get(`/api/admin/clients/${id}`),
+    createClient: (data) => apiClient.post('/api/admin/clients', data),
+    updateClientQuota: (id, data) => apiClient.put(`/api/admin/clients/${id}/quota`, data),
+    // Revenue
+    getPayments: () => apiClient.get('/api/admin/payments'),
+    recordPayment: (data) => apiClient.post('/api/admin/payments', data),
+    getRefunds: () => apiClient.get('/api/admin/refunds'),
+    processRefund: (data) => apiClient.post('/api/admin/refunds', data),
+    // Server Health
+    getHealth: () => apiClient.get('/api/admin/health'),
+    // API Status
+    getApiStatus: () => apiClient.get('/api/admin/api-status'),
+    // Audit Logs
+    getAuditLogs: (page, perPage, action) => apiClient.get('/api/admin/audit-logs', {
+      params: { page, per_page: perPage, action }
+    }),
+    // Announcements
+    getAnnouncements: () => apiClient.get('/api/admin/announcements'),
+    createAnnouncement: (data) => apiClient.post('/api/admin/announcements', data),
+    deleteAnnouncement: (id) => apiClient.delete(`/api/admin/announcements/${id}`),
+    // Settings
+    getSettings: () => apiClient.get('/api/admin/settings'),
+    updateSettings: (data) => apiClient.put('/api/admin/settings', data),
+    // SOS
+    sosToggle: (key) => apiClient.post('/api/admin/sos/toggle', { key }),
+    sosAlertEmail: (data) => apiClient.post('/api/admin/sos/alert-email', data),
+    // Password change
+    changePassword: (data) => apiClient.post('/api/admin/change-password', data),
+  },
 };
 
 // Request interceptor for logging

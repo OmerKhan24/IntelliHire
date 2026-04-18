@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IntelliHire — AI Interview Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --ink: #020408;
+    --paper: #f0ece4;
+    --acid: #b8ff3c;
+    --cold: #3cffee;
+    --warn: #ff6b35;
+    --mute: #2a2f38;
+    --glass: rgba(255,255,255,0.04);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'DM Sans', sans-serif;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* Custom cursor */
+  .cursor {
+    position: fixed; width: 10px; height: 10px;
+    background: var(--acid); border-radius: 50%;
+    pointer-events: none; z-index: 9999;
+    transform: translate(-50%,-50%);
+    transition: transform 0.1s, width 0.2s, height 0.2s;
+    mix-blend-mode: difference;
+  }
+  .cursor-ring {
+    position: fixed; width: 36px; height: 36px;
+    border: 1px solid rgba(184,255,60,0.4);
+    border-radius: 50%; pointer-events: none;
+    z-index: 9998; transform: translate(-50%,-50%);
+    transition: all 0.15s ease;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    position: relative; overflow: hidden;
+    padding: 2rem;
+  }
+
+  .hero-bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(184,255,60,0.06) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 80% 80%, rgba(60,255,238,0.04) 0%, transparent 60%);
+  }
+
+  /* Grid lines */
+  .grid-lines {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 90% 90% at center, black 40%, transparent 100%);
+  }
+
+  /* Particles canvas */
+  #particles { position: absolute; inset: 0; pointer-events: none; }
+
+  .hero-content { position: relative; z-index: 2; text-align: center; max-width: 900px; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid rgba(184,255,60,0.3);
+    background: rgba(184,255,60,0.07);
+    color: var(--acid); font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 6px 14px; border-radius: 100px;
+    margin-bottom: 2.5rem;
+    animation: fadeSlideUp 0.8s ease 0.2s both;
+  }
+  .badge-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--acid);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform: scale(1); }
+    50% { opacity:0.4; transform: scale(1.5); }
+  }
+
+  .hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(5rem, 14vw, 11rem);
+    line-height: 0.92;
+    letter-spacing: -0.01em;
+    margin-bottom: 2rem;
+    animation: fadeSlideUp 0.9s ease 0.4s both;
+  }
+  .hero-title .accent { color: var(--acid); }
+  .hero-title .line2 { display: block; color: rgba(240,236,228,0.2); }
+
+  .hero-sub {
+    font-size: clamp(1rem, 2.2vw, 1.25rem);
+    color: rgba(240,236,228,0.55);
+    font-weight: 300;
+    max-width: 540px; margin: 0 auto 3rem;
+    line-height: 1.65;
+    animation: fadeSlideUp 0.9s ease 0.6s both;
+  }
+
+  .hero-cta {
+    display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;
+    animation: fadeSlideUp 0.9s ease 0.8s both;
+  }
+
+  .btn-primary {
+    background: var(--acid); color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 14px 32px; border: none; border-radius: 4px;
+    cursor: none; text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(184,255,60,0.35);
+  }
+
+  .btn-ghost {
+    background: transparent; color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 14px 32px;
+    border: 1px solid rgba(240,236,228,0.2);
+    border-radius: 4px; cursor: none; text-decoration: none;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .btn-ghost:hover { border-color: var(--acid); color: var(--acid); }
+
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Scrolling marquee */
+  .marquee-wrap {
+    position: relative; overflow: hidden;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.02);
+    padding: 14px 0; margin: 0;
+  }
+  .marquee-track {
+    display: flex; gap: 3rem;
+    animation: marquee 20s linear infinite;
+    white-space: nowrap;
+  }
+  .marquee-track span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: rgba(240,236,228,0.3);
+  }
+  .marquee-track .sep { color: var(--acid); }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  /* ── FEATURES ── */
+  section { padding: 120px 2rem; max-width: 1100px; margin: 0 auto; }
+
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--acid); margin-bottom: 1rem;
+  }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(3rem, 6vw, 5rem);
+    line-height: 1; margin-bottom: 1rem;
+  }
+
+  .section-desc {
+    color: rgba(240,236,228,0.5); font-size: 1.05rem;
+    font-weight: 300; max-width: 500px; line-height: 1.7;
+    margin-bottom: 4rem;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .feat-card {
+    background: var(--ink);
+    padding: 2.5rem;
+    position: relative; overflow: hidden;
+    transition: background 0.3s;
+  }
+  .feat-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--feat-color, var(--acid)), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .feat-card:hover { background: rgba(255,255,255,0.03); }
+  .feat-card:hover::before { opacity: 1; }
+
+  .feat-icon {
+    width: 44px; height: 44px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; margin-bottom: 1.5rem;
+    background: var(--glass);
+  }
+  .feat-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem; letter-spacing: 0.03em;
+    margin-bottom: 0.6rem;
+  }
+  .feat-desc {
+    color: rgba(240,236,228,0.45);
+    font-size: 0.9rem; line-height: 1.6; font-weight: 300;
+  }
+  .feat-tag {
+    display: inline-block;
+    margin-top: 1.2rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.12em;
+    text-transform: uppercase; padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.05);
+    color: rgba(240,236,228,0.35);
+  }
+
+  /* ── TECH STACK ── */
+  .stack-section {
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 80px;
+  }
+
+  .stack-pills {
+    display: flex; flex-wrap: wrap; gap: 0.75rem;
+    margin-top: 2rem;
+  }
+  .pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 8px 16px; border-radius: 100px;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(240,236,228,0.6);
+    transition: all 0.2s;
+    cursor: none;
+  }
+  .pill:hover {
+    border-color: var(--acid); color: var(--acid);
+    background: rgba(184,255,60,0.05);
+  }
+  .pill.hot { border-color: rgba(184,255,60,0.3); color: var(--acid); }
+
+  /* ── STATS ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 2px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px; overflow: hidden;
+    margin: 80px 0;
+  }
+  .stat-box {
+    background: var(--ink); padding: 2.5rem 2rem;
+    text-align: center;
+  }
+  .stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.5rem; color: var(--acid);
+    line-height: 1; display: block;
+  }
+  .stat-label {
+    font-size: 0.8rem; color: rgba(240,236,228,0.4);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace; margin-top: 0.4rem;
+  }
+
+  /* ── PIPELINE ── */
+  .pipeline {
+    display: flex; align-items: center;
+    gap: 0; flex-wrap: wrap;
+    margin-top: 3rem;
+  }
+  .pipe-step {
+    flex: 1; min-width: 140px;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,0.07);
+    padding: 1.5rem; border-radius: 8px;
+    text-align: center; position: relative;
+  }
+  .pipe-step .p-icon { font-size: 1.6rem; margin-bottom: 0.5rem; }
+  .pipe-step .p-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem; letter-spacing: 0.05em;
+    color: rgba(240,236,228,0.85);
+  }
+  .pipe-arrow {
+    color: var(--acid); font-size: 1.2rem;
+    padding: 0 0.5rem; opacity: 0.5;
+    flex-shrink: 0;
+  }
+
+  /* ── CTA FOOTER ── */
+  .cta-footer {
+    text-align: center;
+    padding: 120px 2rem;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 100%, rgba(184,255,60,0.06) 0%, transparent 70%);
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .cta-footer .big-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(3.5rem, 9vw, 7rem);
+    line-height: 0.95; margin-bottom: 2rem;
+  }
+  .cta-footer .big-text em { color: var(--acid); font-style: normal; }
+
+  .footer-meta {
+    margin-top: 4rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.15em;
+    color: rgba(240,236,228,0.2); text-transform: uppercase;
+  }
+
+  /* scroll reveal */
+  .reveal { opacity: 0; transform: translateY(40px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- HERO -->
+<section class="hero" style="padding:0; max-width:100vw;">
+  <div class="hero-bg"></div>
+  <div class="grid-lines"></div>
+  <canvas id="particles"></canvas>
+
+  <div class="hero-content">
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Final Year Project · AI Systems · 2025
+    </div>
+
+    <h1 class="hero-title">
+      INTELLI<span class="accent">HIRE</span>
+      <span class="line2">REIMAGINED</span>
+    </h1>
+
+    <p class="hero-sub">
+      AI-powered candidate screening that reads resumes, conducts voice interviews,
+      detects cheating in real-time, and ranks candidates — automatically.
+    </p>
+
+    <div class="hero-cta">
+      <a href="https://github.com/OmerKhan24/IntelliHire" class="btn-primary">View on GitHub</a>
+      <a href="#features" class="btn-ghost">Explore Features</a>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-wrap">
+  <div class="marquee-track" id="marqueeTrack"></div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <p class="section-label reveal">Core Capabilities</p>
+  <h2 class="section-title reveal">Built Different.</h2>
+  <p class="section-desc reveal">Every layer of the hiring pipeline — automated, scored, and monitored by AI.</p>
+
+  <div class="features-grid reveal">
+    <div class="feat-card" style="--feat-color: #b8ff3c;">
+      <div class="feat-icon">🎙️</div>
+      <div class="feat-name">Voice Interviews</div>
+      <div class="feat-desc">Real-time STT/TTS pipeline. Candidates speak naturally; AI listens, responds, and adapts questions dynamically.</div>
+      <span class="feat-tag">Gemini AI · gTTS · SpeechRecognition</span>
+    </div>
+    <div class="feat-card" style="--feat-color: #3cffee;">
+      <div class="feat-icon">🧠</div>
+      <div class="feat-name">RAG Question Engine</div>
+      <div class="feat-desc">Questions generated from the candidate's own CV and the job description. No two interviews are the same.</div>
+      <span class="feat-tag">LangChain · ChromaDB · LLM</span>
+    </div>
+    <div class="feat-card" style="--feat-color: #ff6b35;">
+      <div class="feat-icon">👁️</div>
+      <div class="feat-name">Live Proctoring</div>
+      <div class="feat-desc">YOLOv8 detects phones. MediaPipe tracks gaze. Tab switching logged. Behavioral flags raised instantly.</div>
+      <span class="feat-tag">YOLOv8 · MediaPipe · OpenCV</span>
+    </div>
+    <div class="feat-card" style="--feat-color: #b8ff3c;">
+      <div class="feat-icon">📊</div>
+      <div class="feat-name">Multi-Modal Scoring</div>
+      <div class="feat-desc">Verbal confidence, semantic accuracy, facial micro-expressions, and behavioral signals — fused into one score.</div>
+      <span class="feat-tag">Sentence Transformers · NLP</span>
+    </div>
+    <div class="feat-card" style="--feat-color: #3cffee;">
+      <div class="feat-icon">📄</div>
+      <div class="feat-name">CV Intelligence</div>
+      <div class="feat-desc">Extracts skills, experience, and gaps. Matches against job requirements. Ranks candidates before they even interview.</div>
+      <span class="feat-tag">Flask · MySQL · ChromaDB</span>
+    </div>
+    <div class="feat-card" style="--feat-color: #ff6b35;">
+      <div class="feat-icon">🏢</div>
+      <div class="feat-name">HR Dashboard</div>
+      <div class="feat-desc">Full role-based access. Create jobs, manage candidates, review AI reports, and make decisions — all in one place.</div>
+      <span class="feat-tag">React · TypeScript · JWT</span>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div style="max-width:1100px; margin:0 auto; padding: 0 2rem;">
+  <div class="stats-row reveal">
+    <div class="stat-box">
+      <span class="stat-num">6</span>
+      <span class="stat-label">AI Models</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-num">4</span>
+      <span class="stat-label">Modalities</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-num">RAG</span>
+      <span class="stat-label">Question Gen</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-num">0</span>
+      <span class="stat-label">Human Bias</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-num">∞</span>
+      <span class="stat-label">Scalability</span>
+    </div>
+  </div>
+</div>
+
+<!-- PIPELINE -->
+<section class="stack-section">
+  <p class="section-label reveal">How It Works</p>
+  <h2 class="section-title reveal">The Pipeline</h2>
+
+  <div class="pipeline reveal">
+    <div class="pipe-step"><div class="p-icon">📤</div><div class="p-name">CV Upload</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="p-icon">🔍</div><div class="p-name">RAG Parse</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="p-icon">🎙️</div><div class="p-name">AI Interview</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="p-icon">👁️</div><div class="p-name">Proctor</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="p-icon">📊</div><div class="p-name">Score</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="p-icon">✅</div><div class="p-name">HR Report</div></div>
+  </div>
+
+  <!-- TECH -->
+  <p class="section-label reveal" style="margin-top:5rem;">Tech Stack</p>
+  <div class="stack-pills reveal">
+    <span class="pill hot">Gemini AI</span>
+    <span class="pill hot">LangChain</span>
+    <span class="pill hot">YOLOv8</span>
+    <span class="pill hot">MediaPipe</span>
+    <span class="pill">React TypeScript</span>
+    <span class="pill">Flask Python</span>
+    <span class="pill">MySQL</span>
+    <span class="pill">ChromaDB</span>
+    <span class="pill">WebRTC</span>
+    <span class="pill">JWT Auth</span>
+    <span class="pill">Sentence Transformers</span>
+    <span class="pill">gTTS</span>
+    <span class="pill">OpenCV</span>
+    <span class="pill">SQLAlchemy</span>
+  </div>
+</section>
+
+<!-- CTA FOOTER -->
+<div class="cta-footer">
+  <div class="big-text reveal">
+    HIRE SMARTER.<br><em>NOT HARDER.</em>
+  </div>
+  <div class="hero-cta reveal">
+    <a href="https://github.com/OmerKhan24/IntelliHire" class="btn-primary">GitHub Repository</a>
+  </div>
+  <div class="footer-meta reveal">
+    IntelliHire · Final Year Project · FAST-NUCES · 2025 · Omer Khan
+  </div>
+</div>
+
+<script>
+// Cursor
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+(function animCursor(){
+  rx += (mx - rx) * 0.15; ry += (my - ry) * 0.15;
+  cursor.style.left = mx + 'px'; cursor.style.top = my + 'px';
+  ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+  requestAnimationFrame(animCursor);
+})();
+
+// Particles
+const canvas = document.getElementById('particles');
+const ctx = canvas.getContext('2d');
+let W, H, pts = [];
+function resize(){ W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize(); window.addEventListener('resize', resize);
+for(let i=0;i<55;i++) pts.push({
+  x: Math.random()*2000-500, y: Math.random()*900,
+  vx: (Math.random()-0.5)*0.3, vy: (Math.random()-0.5)*0.2,
+  r: Math.random()*1.5+0.5, o: Math.random()*0.4+0.1
+});
+function drawPts(){
+  ctx.clearRect(0,0,W,H);
+  pts.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    if(p.x<-100) p.x=W+100; if(p.x>W+100) p.x=-100;
+    if(p.y<-100) p.y=H+100; if(p.y>H+100) p.y=-100;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(184,255,60,${p.o})`;
+    ctx.fill();
+  });
+  // connect close ones
+  for(let i=0;i<pts.length;i++) for(let j=i+1;j<pts.length;j++){
+    const dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d<120){
+      ctx.beginPath();
+      ctx.moveTo(pts[i].x,pts[i].y);
+      ctx.lineTo(pts[j].x,pts[j].y);
+      ctx.strokeStyle=`rgba(184,255,60,${0.07*(1-d/120)})`;
+      ctx.lineWidth=0.5; ctx.stroke();
+    }
+  }
+  requestAnimationFrame(drawPts);
+}
+drawPts();
+
+// Marquee content
+const items = ['RAG Interview Engine','YOLOv8 Proctoring','Voice AI Pipeline',
+  'Multi-Modal Scoring','Gemini + LangChain','ChromaDB Vectors','React TypeScript','Flask API',
+  'JWT Auth','CV Intelligence','Gaze Tracking','Anti-Cheat System'];
+const track = document.getElementById('marqueeTrack');
+const full = [...items,...items,...items,...items];
+full.forEach((t,i) => {
+  const s = document.createElement('span'); s.textContent = t; track.appendChild(s);
+  if(i < full.length-1){ const d = document.createElement('span'); d.className='sep'; d.textContent='·'; track.appendChild(d); }
+});
+
+// Scroll reveal
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>

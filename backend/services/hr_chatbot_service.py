@@ -162,7 +162,16 @@ INSTRUCTIONS:
 
 YOUR RESPONSE:"""
             
-            # Generate response with DeepSeek API using OpenAI SDK
+            # Generate response with DeepSeek API using OpenAI SDK (with rate limiting)
+            import threading, time as _time
+            if not hasattr(HRChatbotService, '_sync_lock'):
+                HRChatbotService._sync_lock = threading.Lock()
+                HRChatbotService._last_sync_call = 0.0
+            with HRChatbotService._sync_lock:
+                elapsed = _time.monotonic() - HRChatbotService._last_sync_call
+                if elapsed < 0.5:
+                    _time.sleep(0.5 - elapsed)
+                HRChatbotService._last_sync_call = _time.monotonic()
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[

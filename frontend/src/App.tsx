@@ -4,7 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import HomePage from './pages/HomePage';
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import JobCreator from './pages/JobCreator';
@@ -14,8 +14,13 @@ import CandidateInterview from './pages/CandidateInterview';
 import CandidateFeedback from './pages/CandidateFeedback';
 import InterviewReport from './pages/InterviewReport';
 import AdminDashboard from './pages/AdminDashboard';
+import ClientDashboard from './pages/ClientDashboard';
 import HRAssistant from './pages/HRAssistant';
 import EmployeeDashboard from './pages/EmployeeDashboard';
+import JobApplyPage from './pages/JobApplyPage';
+import ApplicationsPipeline from './pages/ApplicationsPipeline';
+import SchedulePage from './pages/SchedulePage';
+import ThankYouPage from './pages/ThankYouPage';
 import theme from './theme';
 import './App.css';
 
@@ -26,7 +31,7 @@ function App() {
       <AuthProvider>
         <Router>
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route 
@@ -49,7 +54,7 @@ function App() {
               path="/dashboard" 
               element={
                 <ProtectedRoute requiredRole="interviewer">
-                  <InterviewDashboard />
+                  <ClientDashboard />
                 </ProtectedRoute>
               } 
             />
@@ -81,9 +86,31 @@ function App() {
             path="/interview/:jobId" 
             element={<CandidateInterview />} 
           />
+          {/* Public: candidate applies via share link */}
+          <Route 
+            path="/apply/:shareToken" 
+            element={<JobApplyPage />} 
+          />
+          {/* Interviewer: manage applications pipeline */}
+          <Route 
+            path="/applications/:jobId" 
+            element={
+              <ProtectedRoute requiredRole="interviewer">
+                <ApplicationsPipeline />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/feedback/:interviewId" 
             element={<CandidateFeedback />} 
+          />
+          <Route 
+            path="/schedule/:applicationId" 
+            element={<SchedulePage />} 
+          />
+          <Route 
+            path="/thank-you/:interviewId" 
+            element={<ThankYouPage />} 
           />
           <Route 
             path="/report/:jobId" 

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IntelliHire</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #060d1a;
+    color: #e2e8f0;
+    padding: 40px 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrapper { max-width: 600px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #0b1120 0%, #0f1e38 100%);
+    border: 1px solid rgba(47,151,247,0.2);
+    border-bottom: none;
+    border-radius: 16px 16px 0 0;
+    padding: 32px 40px 28px;
+    text-align: center;
+  }
+  .logo-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #2f97f7, #0ea5e9);
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .logo-text {
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(90deg, #2f97f7, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
+  }
+  .tagline {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── Accent bar ── */
+  .accent-bar {
+    height: 2px;
+    background: linear-gradient(90deg, #2f97f7, #a78bfa, #0ea5e9);
+  }
+
+  /* ── Body ── */
+  .body {
+    background: #0b1120;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-top: none;
+    border-bottom: none;
+    padding: 40px 40px 32px;
+    line-height: 1.75;
+    color: #cbd5e1;
+  }
+  .body h2 {
+    color: #f1f5f9;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .body p { margin-bottom: 14px; font-size: 15px; }
+  .body strong { color: #e2e8f0; font-weight: 600; }
+
+  /* ── Button ── */
+  .btn-wrap { text-align: center; margin: 28px 0; }
+  .btn {
+    display: inline-block;
+    padding: 14px 36px;
+    background: linear-gradient(135deg, #2f97f7, #0ea5e9);
+    color: #ffffff !important;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+    box-shadow: 0 4px 20px rgba(47,151,247,0.35);
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: rgba(255,255,255,0.07);
+    margin: 24px 0;
+  }
+
+  /* ── Stat badge ── */
+  .stat-badge {
+    display: inline-block;
+    padding: 10px 20px;
+    background: rgba(47,151,247,0.1);
+    border: 1px solid rgba(47,151,247,0.25);
+    border-radius: 8px;
+    color: #2f97f7;
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  /* ── Info box ── */
+  .info-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-left: 3px solid #2f97f7;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 14px;
+    color: #94a3b8;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    background: #080f1c;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    padding: 24px 40px;
+    text-align: center;
+  }
+  .footer p {
+    color: rgba(255,255,255,0.28);
+    font-size: 12px;
+    line-height: 1.8;
+    margin: 0;
+  }
+  .footer a { color: rgba(47,151,247,0.7); text-decoration: none; }
+
+  /* ── Responsive ── */
+  @media (max-width: 480px) {
+    .header, .body, .footer { padding-left: 24px; padding-right: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-wrap">
+      <span class="logo-icon">⚡</span>
+      <span class="logo-text">IntelliHire</span>
+    </div>
+    <div class="tagline">AI-Powered Hiring Pipeline &nbsp;·&nbsp; FAST NUCES, Karachi</div>
+  </div>
+  <div class="accent-bar"></div>
+
+  <!-- Body -->
+  <div class="body">
+    
+            <h2>Welcome to IntelliHire, Muhammad Omer Khan!</h2>
+            <p>Your account has been activated on the <strong>Starter</strong> plan.</p>
+            <table style="width:100%;border-collapse:collapse;margin:20px 0">
+              <tr><td style="padding:8px;font-weight:600;border-bottom:1px solid #e2e8f0">Username</td>
+                  <td style="padding:8px;border-bottom:1px solid #e2e8f0">omerkham12345_c08e</td></tr>
+              <tr><td style="padding:8px;font-weight:600;border-bottom:1px solid #e2e8f0">Temporary Password</td>
+                  <td style="padding:8px;border-bottom:1px solid #e2e8f0"><code>381e0c7d01ce</code></td></tr>
+              <tr><td style="padding:8px;font-weight:600;border-bottom:1px solid #e2e8f0">Interview Quota</td>
+                  <td style="padding:8px;border-bottom:1px solid #e2e8f0">50 interviews</td></tr>
+              <tr><td style="padding:8px;font-weight:600;border-bottom:1px solid #e2e8f0">Subscription Start</td>
+                  <td style="padding:8px;border-bottom:1px solid #e2e8f0">April 13, 2026</td></tr>
+              <tr><td style="padding:8px;font-weight:600;border-bottom:1px solid #e2e8f0">Subscription End</td>
+                  <td style="padding:8px;border-bottom:1px solid #e2e8f0">May 13, 2026</td></tr>
+              <tr><td style="padding:8px;font-weight:600">Team Accounts</td>
+                  <td style="padding:8px">Up to 3 sub-accounts</td></tr>
+            </table>
+            <p>Please change your password after your first login.</p>
+            <p><strong>Getting Started:</strong></p>
+            <ol>
+              <li>Log in with your credentials above</li>
+              <li>Create your first job posting</li>
+              <li>Share the interview link with candidates</li>
+              <li>AI will screen, interview, and rank candidates for you</li>
+            </ol>
+            <p style="text-align:center">
+              <a href="http://localhost:3000/login"
+                 class="btn" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#2f97f7,#0ea5e9);color:#fff;text-decoration:none;border-radius:8px;font-weight:600">
+                Log In Now
+              </a>
+            </p>
+        
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>
+      &copy; 2026 IntelliHire &mdash; All rights reserved.<br>
+      FAST-NUCES Karachi &nbsp;|&nbsp; FYP 2025–26<br>
+      <span style="opacity:0.5;">You received this email because you interacted with IntelliHire.</span>
+    </p>
+  </div>
+</div>
+</body>
+</html>

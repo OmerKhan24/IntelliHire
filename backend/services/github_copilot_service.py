@@ -34,14 +34,16 @@ class GitHubCopilotService:
     
     async def _call_api(self, messages, retry_count=0):
         """Make async API call to DeepSeek using OpenAI SDK with retry logic and exponential backoff"""
+        from services.deepseek_rate_limiter import RateLimitedCall
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=2000,
-                temperature=1.0,
-                stream=False
-            )
+            async with RateLimitedCall():
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=2000,
+                    temperature=1.0,
+                    stream=False
+                )
             
             content = response.choices[0].message.content
             

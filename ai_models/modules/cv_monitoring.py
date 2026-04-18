@@ -18,6 +18,47 @@ from enum import Enum
 try:
     import mediapipe as mp
     from ultralytics import YOLO
+    # PyTorch 2.6+ changed weights_only default to True, which breaks ultralytics model loading.
+    # Allowlist the required ultralytics + torch globals so torch.load works safely.
+    try:
+        import torch
+        import torch.serialization
+        import torch.nn.modules.container
+        import torch.nn.modules.activation
+        import torch.nn.modules.batchnorm
+        import torch.nn.modules.conv
+        import torch.nn.modules.pooling
+        import torch.nn.modules.upsampling
+        from ultralytics.nn.tasks import DetectionModel, SegmentationModel, ClassificationModel
+        import ultralytics.nn.modules as _ulm
+
+        _safe_globals = [
+            # Standard torch nn modules
+            torch.nn.modules.container.Sequential,
+            torch.nn.modules.container.ModuleList,
+            torch.nn.modules.container.ModuleDict,
+            torch.nn.modules.activation.SiLU,
+            torch.nn.modules.batchnorm.BatchNorm2d,
+            torch.nn.modules.conv.Conv2d,
+            torch.nn.modules.pooling.MaxPool2d,
+            torch.nn.modules.pooling.AdaptiveAvgPool2d,
+            torch.nn.modules.upsampling.Upsample,
+            # Ultralytics model classes
+            DetectionModel,
+        ]
+        # Dynamically add all ultralytics nn module classes
+        for _name in dir(_ulm):
+            _obj = getattr(_ulm, _name)
+            try:
+                if isinstance(_obj, type):
+                    _safe_globals.append(_obj)
+            except Exception:
+                pass
+
+        if hasattr(torch.serialization, 'add_safe_globals'):
+            torch.serialization.add_safe_globals(_safe_globals)
+    except Exception as _torch_err:
+        pass  # Older PyTorch or missing symbols — no-op
 except ImportError as e:
     print(f"Warning: Some imports failed - {e}. Module will work in proper environment.")
 
