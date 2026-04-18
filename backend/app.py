@@ -67,7 +67,7 @@ def create_app(config_name='development'):
     _ALLOWED_ORIGINS = [
         'http://localhost:3000', 'http://127.0.0.1:3000',
         'http://192.168.100.80:3000', 'http://192.168.100.80:5000',
-        'http://192.168.18.9:3000', 'http://192.168.18.9:5000',
+        'http://192.168.18.9:3000', 'http://192.168.18.9:5000', 'http://127.0.0.1:3001','http://localhost:3001'
     ]
     CORS(app,
          origins=_ALLOWED_ORIGINS,
@@ -141,6 +141,13 @@ def create_app(config_name='development'):
     
     return app
 
+def _port_in_use(port: int) -> bool:
+    """Return True if something is already listening on the given port."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex(('127.0.0.1', port)) == 0
+
 if __name__ == '__main__':
     # Get environment configuration
     env = os.environ.get('FLASK_ENV', 'development')
@@ -156,46 +163,57 @@ if __name__ == '__main__':
 
         # ── Next.js landing page (port 3001) ──────────────────────────────
         if os.path.isdir(landing_dir):
-            print("🌐  Starting Next.js landing page...")
-            try:
-                env_with_port = {**os.environ, 'PORT': '3001'}
-                if sys.platform == 'win32':
-                    landing_process = subprocess.Popen(
-                        'npm run dev -- -p 3001',
-                        cwd=landing_dir,
-                        shell=True,
-                        env=env_with_port,
-                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                    )
-                else:
-                    landing_process = subprocess.Popen(
-                        ['npm', 'run', 'dev', '--', '-p', '3001'],
-                        cwd=landing_dir,
-                        env=env_with_port,
-                    )
-                print(f"✅ Landing page starting at: http://localhost:3001")
-            except Exception as e:
-                print(f"⚠️  Could not start landing page: {e}")
+            if _port_in_use(3001):
+                print("🌐  Landing page already running at: http://localhost:3001")
+            else:
+                print("🌐  Starting Next.js landing page...")
+                try:
+                    spawn_env = {**os.environ, 'PORT': '3001', 'BROWSER': 'none'}
+                    if sys.platform == 'win32':
+                        landing_process = subprocess.Popen(
+                            'npm run dev -- -p 3001',
+                            cwd=landing_dir,
+                            shell=True,
+                            env=spawn_env,
+                            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                        )
+                    else:
+                        landing_process = subprocess.Popen(
+                            ['npm', 'run', 'dev', '--', '-p', '3001'],
+                            cwd=landing_dir,
+                            env=spawn_env,
+                        )
+                    print(f"✅ Landing page starting at: http://localhost:3001")
+                except Exception as e:
+                    print(f"⚠️  Could not start landing page: {e}")
 
         # ── CRA app (port 3000) ───────────────────────────────────────────
         if os.path.isdir(frontend_dir):
-            print("🖥️   Starting React app...")
-            try:
-                if sys.platform == 'win32':
-                    frontend_process = subprocess.Popen(
-                        'npm start',
-                        cwd=frontend_dir,
-                        shell=True,
-                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                    )
-                else:
-                    frontend_process = subprocess.Popen(
-                        ['npm', 'start'],
-                        cwd=frontend_dir,
-                    )
-                print(f"✅ App starting at: http://localhost:3000")
-            except Exception as e:
-                print(f"⚠️  Could not start frontend app: {e}")
+            if _port_in_use(3000):
+                print("🖥️   React app already running at:  http://localhost:3000")
+            else:
+                print("🖥️   Starting React app...")
+                try:
+                    # BROWSER=none  — don't open a tab
+                    # CI=true       — suppress the "port in use, use another?" prompt
+                    spawn_env = {**os.environ, 'BROWSER': 'none', 'CI': 'true'}
+                    if sys.platform == 'win32':
+                        frontend_process = subprocess.Popen(
+                            'npm start',
+                            cwd=frontend_dir,
+                            shell=True,
+                            env=spawn_env,
+                            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                        )
+                    else:
+                        frontend_process = subprocess.Popen(
+                            ['npm', 'start'],
+                            cwd=frontend_dir,
+                            env=spawn_env,
+                        )
+                    print(f"✅ App starting at: http://localhost:3000")
+                except Exception as e:
+                    print(f"⚠️  Could not start frontend app: {e}")
 
     # Create app
     app = create_app(env)
