@@ -9,6 +9,7 @@
 set -e
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+LANDING_DIR="$(cd "$REPO_DIR/../landing_page_mockup" && pwd)"
 LOG_DIR="$REPO_DIR/logs"
 FRONTEND_DIR="$REPO_DIR/frontend"
 BACKEND_DIR="$REPO_DIR/backend"
@@ -40,19 +41,27 @@ fi
 pip install -q -r requirements.txt
 pip install -q gunicorn   # ensure gunicorn is present
 
-# ── 3. Frontend – install & build ────────────────────────────────────────────
-echo "⚛️   Building React frontend..."
+# ── 3. CRA frontend – install & build ────────────────────────────────────────
+echo "⚛️   Building React app..."
 cd "$FRONTEND_DIR"
 npm ci --silent
 npm run build
 
-# Install 'serve' globally if missing (used by pm2 to host the static build)
+# ── 4. Next.js landing page – install & build ─────────────────────────────────
+echo "🌐  Building Next.js landing page..."
+cd "$LANDING_DIR"
+npm ci --silent
+NEXT_PUBLIC_APP_URL="http://localhost:3000" \
+NEXT_PUBLIC_API_URL="http://localhost:5000" \
+npm run build
+
+# Install 'serve' globally if missing (used by pm2 to host the CRA static build)
 if ! command -v serve &> /dev/null; then
   echo "📡  Installing 'serve' globally..."
   npm install -g serve
 fi
 
-# ── 4. Start / Restart with pm2 ───────────────────────────────────────────────
+# ── 5. Start / Restart with pm2 ───────────────────────────────────────────────
 cd "$REPO_DIR"
 
 if [ "$1" == "--restart" ]; then
@@ -67,11 +76,12 @@ pm2 save
 
 echo ""
 echo "✅  Deployment complete!"
-echo "   Backend  → http://0.0.0.0:5000"
-echo "   Frontend → http://0.0.0.0:3000"
+echo "   Landing page → http://0.0.0.0:3001  (Next.js)"
+echo "   React app    → http://0.0.0.0:3000  (CRA)"
+echo "   Backend API  → http://0.0.0.0:5000  (Flask)"
 echo ""
 echo "   Useful commands:"
-echo "     pm2 status              — check process health"
-echo "     pm2 logs                — tail all logs"
-echo "     pm2 logs intellihire-backend  — backend logs only"
-echo "     pm2 startup             — enable auto-start on reboot"
+echo "     pm2 status                     — check process health"
+echo "     pm2 logs                       — tail all logs"
+echo "     pm2 logs intellihire-backend   — backend logs only"
+echo "     pm2 startup                    — enable auto-start on reboot"

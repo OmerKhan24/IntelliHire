@@ -145,35 +145,66 @@ if __name__ == '__main__':
     # Get environment configuration
     env = os.environ.get('FLASK_ENV', 'development')
 
-    # Auto-start frontend dev server (only in development, not when pm2 manages it)
+    # Auto-start frontend servers (only in development, not when pm2 manages it)
+    landing_process = None
     frontend_process = None
     if env == 'development' and os.environ.get('NO_FRONTEND') != '1':
-        frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
-        print("🖥️  Starting React frontend...")
-        try:
-            if sys.platform == 'win32':
-                frontend_process = subprocess.Popen(
-                    'npm start',
-                    cwd=frontend_dir,
-                    shell=True,
-                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                )
-            else:
-                frontend_process = subprocess.Popen(
-                    ['npm', 'start'],
-                    cwd=frontend_dir,
-                )
-            print(f"✅ Frontend starting at: http://localhost:3000")
-        except Exception as e:
-            print(f"⚠️  Could not start frontend: {e}")
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.abspath(os.path.join(backend_dir, '..'))
+        landing_dir = os.path.abspath(os.path.join(root_dir, '..', 'landing_page_mockup'))
+        frontend_dir = os.path.abspath(os.path.join(root_dir, 'frontend'))
+
+        # ── Next.js landing page (port 3001) ──────────────────────────────
+        if os.path.isdir(landing_dir):
+            print("🌐  Starting Next.js landing page...")
+            try:
+                env_with_port = {**os.environ, 'PORT': '3001'}
+                if sys.platform == 'win32':
+                    landing_process = subprocess.Popen(
+                        'npm run dev -- -p 3001',
+                        cwd=landing_dir,
+                        shell=True,
+                        env=env_with_port,
+                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                    )
+                else:
+                    landing_process = subprocess.Popen(
+                        ['npm', 'run', 'dev', '--', '-p', '3001'],
+                        cwd=landing_dir,
+                        env=env_with_port,
+                    )
+                print(f"✅ Landing page starting at: http://localhost:3001")
+            except Exception as e:
+                print(f"⚠️  Could not start landing page: {e}")
+
+        # ── CRA app (port 3000) ───────────────────────────────────────────
+        if os.path.isdir(frontend_dir):
+            print("🖥️   Starting React app...")
+            try:
+                if sys.platform == 'win32':
+                    frontend_process = subprocess.Popen(
+                        'npm start',
+                        cwd=frontend_dir,
+                        shell=True,
+                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                    )
+                else:
+                    frontend_process = subprocess.Popen(
+                        ['npm', 'start'],
+                        cwd=frontend_dir,
+                    )
+                print(f"✅ App starting at: http://localhost:3000")
+            except Exception as e:
+                print(f"⚠️  Could not start frontend app: {e}")
 
     # Create app
     app = create_app(env)
 
     # Run development server
     print("🚀 Starting IntelliHire API Server...")
-    print(f"📡 Server running on: http://localhost:5000")
-    print(f"🌐 Frontend URL: http://localhost:3000")
+    print(f"📡 API running on:      http://localhost:5000")
+    print(f"🌐 Landing page:        http://localhost:3001")
+    print(f"🖥️   React app:          http://localhost:3000")
     print(f"🔧 Environment: {env}")
 
     try:
@@ -186,3 +217,5 @@ if __name__ == '__main__':
     finally:
         if frontend_process:
             frontend_process.terminate()
+        if landing_process:
+            landing_process.terminate()
