@@ -32,3 +32,6 @@ pydantic==2.6.0
 # OpenAI SDK for GitHub Copilot integration
 openai
 
+# ElevenLabs Text-to-Speech
+elevenlabs>=1.0.0
+

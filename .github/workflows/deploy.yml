@@ -1,0 +1,62 @@
+name: Deploy to Contabo
+
+# ─── Triggers ───────────────────────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - production          # auto-deploy on every push to production
+
+  workflow_dispatch:        # allow manual trigger from GitHub UI
+    inputs:
+      mode:
+        description: 'Deployment mode'
+        required: false
+        default: '--restart'
+        type: choice
+        options:
+          - '--restart'
+          - '--fresh'
+
+# ─── Jobs ────────────────────────────────────────────────────────────────────
+jobs:
+  deploy:
+    name: SSH Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Only run when pushed to production (workflow_dispatch bypasses this)
+    environment: production
+
+    steps:
+      # ── 1. Checkout (just to validate; actual code is pulled on server) ──
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Write SSH private key ─────────────────────────────────────────
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.CONTABO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.CONTABO_HOST }}" >> ~/.ssh/known_hosts
+
+      # ── 3. Run deploy script on Contabo ─────────────────────────────────
+      - name: Deploy on server
+        env:
+          DEPLOY_MODE: ${{ github.event.inputs.mode || '--restart' }}
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -i ~/.ssh/id_rsa \
+              "${{ secrets.CONTABO_USER }}@${{ secrets.CONTABO_HOST }}" \
+              "bash /home/${{ secrets.CONTABO_USER }}/intellihire/deploy.sh $DEPLOY_MODE"
+
+      # ── 4. Notify result ─────────────────────────────────────────────────
+      - name: Deployment summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Deployed successfully to Contabo (${{ secrets.CONTABO_HOST }})"
+          else
+            echo "❌ Deployment FAILED — check logs above"
+            exit 1
+          fi

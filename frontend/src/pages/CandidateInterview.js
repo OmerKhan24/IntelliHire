@@ -291,33 +291,80 @@ const CandidateInterview = () => {
     }
   };
 
-  const speakQuestion = (questionText) => {
-    if (!synthRef.current) {
-      console.warn('Speech synthesis not available');
-      return;
+  // Ref that holds the currently playing ElevenLabs <audio> element
+  const ttsAudioRef = useRef(null);
+
+  const speakQuestion = async (questionText) => {
+    if (!questionText) return;
+
+    // Stop any currently playing audio
+    stopSpeaking();
+
+    const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+    try {
+      setIsSpeaking(true);
+      const resp = await fetch(`${API_BASE}/api/interviews/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: questionText }),
+      });
+
+      if (!resp.ok) throw new Error(`TTS API returned ${resp.status}`);
+
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+
+      const audio = new Audio(url);
+      ttsAudioRef.current = audio;
+
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(url);
+        ttsAudioRef.current = null;
+      };
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(url);
+        ttsAudioRef.current = null;
+        // Browser TTS fallback
+        _browserTTSFallback(questionText);
+      };
+
+      await audio.play();
+    } catch (err) {
+      console.warn('ElevenLabs TTS failed, using browser fallback:', err);
+      setIsSpeaking(false);
+      _browserTTSFallback(questionText);
     }
-    
-    // Cancel any ongoing speech
+  };
+
+  /** Browser Web Speech API fallback */
+  const _browserTTSFallback = (questionText) => {
+    if (!synthRef.current) return;
     synthRef.current.cancel();
-    
     const utterance = new SpeechSynthesisUtterance(questionText);
     utterance.rate = 0.9;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
     utterance.lang = 'en-US';
-    
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
-    
     synthRef.current.speak(utterance);
   };
 
   const stopSpeaking = () => {
+    // Stop ElevenLabs audio
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
+    }
+    // Stop browser TTS
     if (synthRef.current) {
       synthRef.current.cancel();
-      setIsSpeaking(false);
     }
+    setIsSpeaking(false);
   };
 
   const startAudioRecording = () => {

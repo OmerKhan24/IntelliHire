@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app, send_from_directory
+from flask import Blueprint, request, jsonify, current_app, send_from_directory, send_file, Response as FlaskResponse
 from datetime import datetime
 import logging
 import asyncio
@@ -12,6 +12,7 @@ from services.gemini_service import GeminiService
 from services.github_copilot_service import GitHubCopilotService
 from services.cv_monitoring_service import cv_monitoring_service
 from services.report_generation_service import ReportGenerationService
+from services.elevenlabs_service import elevenlabs_service
 from routes.hr_routes import hr_blueprint, init_hr_services
 from routes.application_routes import application_bp, init_application_services
 from routes.admin_routes import admin_bp
@@ -904,6 +905,43 @@ def submit_response(interview_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ── ElevenLabs Text-to-Speech ─────────────────────────────────────────────────
+@interview_bp.route('/tts', methods=['POST', 'OPTIONS'])
+def generate_tts():
+    """
+    Convert interview question text to speech using ElevenLabs (or gTTS fallback).
+
+    Request JSON: { "text": "..." }
+    Response: audio/mpeg stream
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.get_json(silent=True) or {}
+    text = (data.get('text') or '').strip()
+    if not text:
+        return jsonify({'error': 'text is required'}), 400
+    if len(text) > 5000:
+        return jsonify({'error': 'text exceeds 5000 character limit'}), 400
+
+    try:
+        def _stream():
+            for chunk in elevenlabs_service.text_to_speech_stream(text):
+                yield chunk
+
+        return FlaskResponse(
+            _stream(),
+            mimetype='audio/mpeg',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-TTS-Provider': 'elevenlabs' if elevenlabs_service.api_key else 'gtts',
+            },
+        )
+    except Exception as exc:
+        logger.error('TTS generation failed: %s', exc)
+        return jsonify({'error': 'TTS generation failed', 'detail': str(exc)}), 500
 
 
 @interview_bp.route('/upload_audio', methods=['POST', 'OPTIONS'])
