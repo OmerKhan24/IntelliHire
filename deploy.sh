@@ -24,7 +24,8 @@ mkdir -p "$LOG_DIR"
 echo "📦  Pulling latest code from production branch..."
 git -C "$REPO_DIR" fetch origin
 git -C "$REPO_DIR" checkout production
-git -C "$REPO_DIR" pull origin production
+git -C "$REPO_DIR" reset --hard origin/production
+git -C "$REPO_DIR" clean -fd
 
 # ── 2. Backend – Python dependencies ─────────────────────────────────────────
 echo "🐍  Installing backend dependencies..."
