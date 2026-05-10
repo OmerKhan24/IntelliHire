@@ -49,7 +49,7 @@ echo "🌐  Building Next.js landing page..."
 LANDING_DIR="$REPO_DIR/landing_page"
 if [ -d "$LANDING_DIR" ]; then
   cd "$LANDING_DIR"
-  npm ci --silent
+  npm ci
   NEXT_PUBLIC_APP_URL="https://intellihire.com.pk" \
   NEXT_PUBLIC_API_URL="https://intellihire.com.pk/api" \
   npm run build
