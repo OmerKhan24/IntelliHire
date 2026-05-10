@@ -48,7 +48,10 @@ jobs:
           ssh -o StrictHostKeyChecking=no \
               -i ~/.ssh/id_rsa \
               "${{ secrets.CONTABO_USER }}@${{ secrets.CONTABO_HOST }}" \
-              "bash /root/intellihire/deploy.sh $DEPLOY_MODE"
+              "git -C /root/intellihire fetch origin && \
+               git -C /root/intellihire reset --hard origin/production && \
+               git -C /root/intellihire clean -fd && \
+               bash /root/intellihire/deploy.sh $DEPLOY_MODE"
 
       # ── 4. Notify result ─────────────────────────────────────────────────
       - name: Deployment summary
