@@ -48,15 +48,16 @@ npm run build
 
 # ── 4. Next.js landing page – install & build ─────────────────────────────────
 echo "🌐  Building Next.js landing page..."
-LANDING_DIR="$REPO_DIR/../landing_page_mockup"
+LANDING_DIR="$REPO_DIR/landing_page"
 if [ -d "$LANDING_DIR" ]; then
   cd "$LANDING_DIR"
   npm ci --silent
-  NEXT_PUBLIC_APP_URL="http://207.180.254.104" \
-  NEXT_PUBLIC_API_URL="http://207.180.254.104/api" \
+  NEXT_PUBLIC_APP_URL="https://intellihire.com.pk" \
+  NEXT_PUBLIC_API_URL="https://intellihire.com.pk/api" \
   npm run build
+  pm2 reload intellihire-landing 2>/dev/null || pm2 start ecosystem.config.js --only intellihire-landing --env production
 else
-  echo "⚠️  landing_page_mockup not found at $LANDING_DIR — skipping"
+  echo "⚠️  landing_page not found at $LANDING_DIR — skipping"
 fi
 
 # Install 'serve' globally if missing (used by pm2 to host the CRA static build)
