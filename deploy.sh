@@ -37,6 +37,7 @@ else
   python3 -m venv ../.venv
   source ../.venv/bin/activate
 fi
+pip install -q --upgrade pip setuptools wheel
 pip install -q -r requirements.txt
 pip install -q gunicorn   # ensure gunicorn is present
 
