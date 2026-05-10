@@ -16,9 +16,9 @@ Werkzeug==2.3.7
 opencv-python==4.8.1.78
 mediapipe==0.10.21
 ultralytics==8.0.200
-numpy==1.24.3
+numpy>=1.26.4
 aiohttp==3.9.1
-protobuf==3.20.3
+protobuf>=3.20,<5
 
 # HR Chatbot Module Dependencies
 PyPDF2==3.0.1

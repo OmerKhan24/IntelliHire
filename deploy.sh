@@ -29,15 +29,12 @@ git -C "$REPO_DIR" clean -fd
 # ── 2. Backend – Python dependencies ─────────────────────────────────────────
 echo "🐍  Installing backend dependencies..."
 cd "$BACKEND_DIR"
-if [ -f "../.venv/bin/python" ]; then
-  source ../.venv/bin/activate
-elif [ -f "../.venv_cv/bin/python" ]; then
-  source ../.venv_cv/bin/activate
-else
-  python3 -m venv ../.venv
-  source ../.venv/bin/activate
-fi
-pip install -q --upgrade pip setuptools wheel
+# Wipe stale venv to avoid Python 3.12 compatibility conflicts
+rm -rf "$REPO_DIR/.venv" "$REPO_DIR/.venv_cv"
+python3 -m venv "$REPO_DIR/.venv"
+source "$REPO_DIR/.venv/bin/activate"
+# Pin setuptools<82 (torch requires it) and upgrade pip+wheel
+pip install -q --upgrade pip "setuptools>=68,<82" wheel
 pip install -q -r requirements.txt
 pip install -q gunicorn   # ensure gunicorn is present
 
