@@ -52,7 +52,8 @@ if [ -d "$LANDING_DIR" ]; then
   npm ci --legacy-peer-deps
   NEXT_PUBLIC_APP_URL="https://intellihire.com.pk" \
   NEXT_PUBLIC_API_URL="https://intellihire.com.pk/api" \
-  npm run build
+  NODE_OPTIONS="--max-old-space-size=768" \
+  npm run build -- --no-turbopack
   mkdir -p "$LANDING_DIR/logs"
   pm2 delete intellihire-landing 2>/dev/null; pm2 start "$REPO_DIR/ecosystem.config.js" --only intellihire-landing --env production ; pm2 save
 else
