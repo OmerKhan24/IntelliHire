@@ -53,7 +53,7 @@ if [ -d "$LANDING_DIR" ]; then
   NEXT_PUBLIC_APP_URL="https://intellihire.com.pk" \
   NEXT_PUBLIC_API_URL="https://intellihire.com.pk/api" \
   npm run build
-  pm2 reload intellihire-landing 2>/dev/null || pm2 start ecosystem.config.js --only intellihire-landing --env production
+  pm2 delete intellihire-landing 2>/dev/null; pm2 start ecosystem.config.js --only intellihire-landing --env production ; pm2 save
 else
   echo "⚠️  landing_page not found at $LANDING_DIR — skipping"
 fi
