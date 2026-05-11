@@ -55,7 +55,9 @@ if [ -d "$LANDING_DIR" ]; then
   NODE_OPTIONS="--max-old-space-size=1024" \
   npm run build
   mkdir -p "$LANDING_DIR/logs"
-  pm2 delete intellihire-landing 2>/dev/null; pm2 start "$REPO_DIR/ecosystem.config.js" --only intellihire-landing --env production ; pm2 save
+  pm2 delete intellihire-landing 2>/dev/null || true
+  pm2 start "$REPO_DIR/ecosystem.config.js" --only intellihire-landing --env production
+  pm2 save
 else
   echo "⚠️  landing_page not found at $LANDING_DIR — skipping"
 fi
