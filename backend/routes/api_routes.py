@@ -906,6 +906,27 @@ def submit_response(interview_id):
         return jsonify({'error': str(e)}), 500
 
 
+@interview_bp.route('/tts', methods=['POST', 'OPTIONS'])
+def text_to_speech_endpoint():
+    """Generate speech audio from text using ElevenLabs and return MP3 bytes."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json()
+        text = (data or {}).get('text', '').strip()
+        if not text:
+            return jsonify({'error': 'text is required'}), 400
+        if gemini_service is None:
+            return jsonify({'error': 'TTS service not available'}), 503
+
+        from flask import Response
+        audio_bytes = gemini_service.text_to_speech_bytes(text)
+        return Response(audio_bytes, mimetype='audio/mpeg')
+    except Exception as e:
+        logger.error(f"❌ TTS error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @interview_bp.route('/upload_audio', methods=['POST', 'OPTIONS'])
 def upload_audio():
     """Upload and analyze audio recording of candidate's answer"""

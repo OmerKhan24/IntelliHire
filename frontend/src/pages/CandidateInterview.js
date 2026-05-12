@@ -73,7 +73,7 @@ const CandidateInterview = () => {
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const recognitionRef = useRef(null);
-  const synthRef = useRef(null);
+  const ttsAudioRef = useRef(null);
   const audioRecorderRef = useRef(null);
   
   // Warnings and monitoring
@@ -205,8 +205,7 @@ const CandidateInterview = () => {
       // Initialize Speech Recognition (STT)
       initializeSpeechRecognition();
       
-      // Initialize Text-to-Speech (TTS)
-      synthRef.current = window.speechSynthesis;
+      // ElevenLabs TTS — audio played via backend endpoint, no setup needed
       
     } catch (err) {
       console.error('Media access denied:', err);
@@ -291,33 +290,43 @@ const CandidateInterview = () => {
     }
   };
 
-  const speakQuestion = (questionText) => {
-    if (!synthRef.current) {
-      console.warn('Speech synthesis not available');
-      return;
+  const speakQuestion = async (questionText) => {
+    // Stop any ongoing speech
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
     }
-    
-    // Cancel any ongoing speech
-    synthRef.current.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance(questionText);
-    utterance.rate = 0.9;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    utterance.lang = 'en-US';
-    
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    
-    synthRef.current.speak(utterance);
+    setIsSpeaking(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/interviews/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ text: questionText }),
+      });
+      if (!response.ok) throw new Error('TTS request failed');
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      ttsAudioRef.current = audio;
+      audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(audioUrl); };
+      audio.onerror = () => { setIsSpeaking(false); URL.revokeObjectURL(audioUrl); };
+      await audio.play();
+    } catch (err) {
+      console.error('ElevenLabs TTS error:', err);
+      setIsSpeaking(false);
+    }
   };
 
   const stopSpeaking = () => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
-      setIsSpeaking(false);
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
     }
+    setIsSpeaking(false);
   };
 
   const startAudioRecording = () => {

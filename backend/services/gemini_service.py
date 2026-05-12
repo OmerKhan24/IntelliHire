@@ -1,48 +1,67 @@
 import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from gtts import gTTS
 import tempfile
+from elevenlabs.client import ElevenLabs
 
 
 class GeminiService:
     """
-    Google services for Text-to-Speech (TTS) only.
-    Question generation and scoring now handled by GitHub Copilot API.
+    Text-to-Speech service using ElevenLabs.
+    Question generation and scoring handled by GitHub Copilot API.
     """
-    
+
     def __init__(self):
         self.executor = ThreadPoolExecutor(max_workers=3)
-        # TTS is always enabled (uses gTTS, no API key needed)
+        api_key = os.environ.get('ELEVENLABS_API_KEY')
+        self.voice_id = os.environ.get('ELEVENLABS_VOICE_ID', 'UgBBYS2sOqTuMpoF3BR0')
+        if not api_key:
+            raise ValueError("ELEVENLABS_API_KEY is not set")
+        self.client = ElevenLabs(api_key=api_key)
         self.enabled = True
-        print("✅ Google TTS service enabled")
-    
+        print("✅ ElevenLabs TTS service enabled")
+
     async def text_to_speech(self, text, lang='en'):
         """
-        Convert text to speech using Google Text-to-Speech (gTTS)
-        
-        Args:
-            text: Text to convert to speech
-            lang: Language code (default: 'en')
-        
+        Convert text to speech using ElevenLabs.
+
         Returns:
-            str: Path to generated audio file, or None on error
+            str: Path to generated MP3 file, or None on error
         """
         try:
             loop = asyncio.get_event_loop()
-            
+
             def _generate_tts():
-                tts = gTTS(text=text, lang=lang, slow=False)
+                audio_generator = self.client.text_to_speech.convert(
+                    voice_id=self.voice_id,
+                    text=text,
+                    model_id="eleven_turbo_v2_5",
+                    output_format="mp3_44100_128",
+                )
+                audio_bytes = b"".join(audio_generator)
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
-                tts.save(temp_file.name)
+                temp_file.write(audio_bytes)
+                temp_file.close()
                 return temp_file.name
-            
+
             audio_path = await loop.run_in_executor(self.executor, _generate_tts)
-            print(f"✅ Generated TTS audio: {audio_path}")
+            print(f"✅ Generated ElevenLabs TTS audio: {audio_path}")
             return audio_path
         except Exception as e:
-            print(f"❌ Error in text-to-speech: {e}")
+            print(f"❌ Error in ElevenLabs text-to-speech: {e}")
             return None
+
+    def text_to_speech_bytes(self, text):
+        """
+        Synchronous version — returns raw MP3 bytes for streaming to frontend.
+        """
+        audio_generator = self.client.text_to_speech.convert(
+            voice_id=self.voice_id,
+            text=text,
+            model_id="eleven_turbo_v2_5",
+            output_format="mp3_44100_128",
+        )
+        return b"".join(audio_generator)
 
 
 gemini_service = GeminiService()
