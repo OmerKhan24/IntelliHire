@@ -29,7 +29,8 @@ const C = {
   success: '#10b981', warning: '#f59e0b', error: '#ef4444',
   border: 'rgba(255,255,255,0.08)',
 };
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Empty string = relative URL; nginx proxies /api/* to Flask backend on same domain
+const API_URL = process.env.REACT_APP_API_URL || '';
 
 /* ─── Shared Styles ─── */
 const glassCard = {

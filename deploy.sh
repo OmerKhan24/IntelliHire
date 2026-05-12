@@ -42,7 +42,8 @@ pip install -q gunicorn   # ensure gunicorn is present
 echo "⚛️   Building React app..."
 cd "$FRONTEND_DIR"
 npm ci --silent
-npm run build
+# Empty REACT_APP_API_URL → relative URLs; nginx proxies /api/* to Flask backend
+REACT_APP_API_URL='' npm run build
 
 # ── 4. Next.js landing page – install & build ─────────────────────────────────
 echo "🌐  Building Next.js landing page..."
