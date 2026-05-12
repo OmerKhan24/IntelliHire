@@ -26,8 +26,8 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: '3001',
-        NEXT_PUBLIC_APP_URL: 'http://207.180.254.104',
-        NEXT_PUBLIC_API_URL: 'http://207.180.254.104',
+        NEXT_PUBLIC_APP_URL: 'https://intellihire.com.pk',
+        NEXT_PUBLIC_API_URL: 'https://intellihire.com.pk',
       },
       watch: false,
       max_memory_restart: '512M',

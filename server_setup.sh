@@ -118,7 +118,7 @@ fi
 log "⚛️   Building React frontend..."
 cd "$REPO_DIR/frontend"
 npm ci --silent
-REACT_APP_API_URL="http://207.180.254.104:5000" npm run build
+REACT_APP_API_URL="https://intellihire.com.pk" npm run build
 log "✅  React build done"
 
 # ── 9. PM2 start ─────────────────────────────────────────────────────────────

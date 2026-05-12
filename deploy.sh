@@ -42,7 +42,7 @@ pip install -q gunicorn   # ensure gunicorn is present
 echo "⚛️   Building React app..."
 cd "$FRONTEND_DIR"
 npm ci --silent
-npm run build
+REACT_APP_API_URL="https://intellihire.com.pk" npm run build
 
 # ── 4. Next.js landing page – install & build ─────────────────────────────────
 echo "🌐  Building Next.js landing page..."
@@ -55,6 +55,7 @@ if [ -d "$LANDING_DIR" ]; then
   NODE_OPTIONS="--max-old-space-size=1024" \
   npm run build
   mkdir -p "$LANDING_DIR/logs"
+  cd "$REPO_DIR"
   pm2 delete intellihire-landing 2>/dev/null || true
   pm2 start "$REPO_DIR/ecosystem.config.js" --only intellihire-landing --env production
   pm2 save
