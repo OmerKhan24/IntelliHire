@@ -42,7 +42,7 @@ pip install -q gunicorn   # ensure gunicorn is present
 echo "⚛️   Building React app..."
 cd "$FRONTEND_DIR"
 npm ci --silent
-REACT_APP_API_URL="https://intellihire.com.pk" npm run build
+npm run build
 
 # ── 4. Next.js landing page – install & build ─────────────────────────────────
 echo "🌐  Building Next.js landing page..."
@@ -51,7 +51,7 @@ if [ -d "$LANDING_DIR" ]; then
   cd "$LANDING_DIR"
   npm ci --legacy-peer-deps
   NEXT_PUBLIC_APP_URL="https://intellihire.com.pk" \
-  NEXT_PUBLIC_API_URL="https://intellihire.com.pk/api" \
+  NEXT_PUBLIC_API_URL="https://intellihire.com.pk" \
   NODE_OPTIONS="--max-old-space-size=1024" \
   npm run build
   mkdir -p "$LANDING_DIR/logs"
