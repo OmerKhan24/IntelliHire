@@ -15,7 +15,7 @@ module.exports = {
       name: 'intellihire-landing',
       script: 'node_modules/.bin/next',
       args: 'start -p 3001',
-      cwd: '../landing_page_mockup',
+      cwd: './landing_page',
       interpreter: 'none',
       env: {
         NODE_ENV: 'development',
@@ -26,8 +26,8 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: '3001',
-        NEXT_PUBLIC_APP_URL: 'http://localhost:3000',  // update to your domain
-        NEXT_PUBLIC_API_URL: 'http://localhost:5000',
+        NEXT_PUBLIC_APP_URL: 'https://intellihire.com.pk',
+        NEXT_PUBLIC_API_URL: 'https://intellihire.com.pk',
       },
       watch: false,
       max_memory_restart: '512M',

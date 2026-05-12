@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 // Create axios instance with base configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Empty string = relative URL (nginx proxies /api/ to Flask on same domain)
+// REACT_APP_API_URL can override this at build time if needed
+const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

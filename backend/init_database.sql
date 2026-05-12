@@ -2,9 +2,9 @@
 -- Run this in phpMyAdmin or MySQL command line
 
 -- Create database
-CREATE DATABASE IF NOT EXISTS intellihire_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS intellihire_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-USE intellihire_dev;
+USE intellihire_db;
 
 -- Users table (for authentication)
 CREATE TABLE IF NOT EXISTS users (

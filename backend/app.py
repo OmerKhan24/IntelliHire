@@ -66,8 +66,11 @@ def create_app(config_name='development'):
     # Enhanced CORS configuration - Allow access from network devices
     _ALLOWED_ORIGINS = [
         'http://localhost:3000', 'http://127.0.0.1:3000',
+        'http://localhost:3001', 'http://127.0.0.1:3001',
         'http://192.168.100.80:3000', 'http://192.168.100.80:5000',
-        'http://192.168.18.9:3000', 'http://192.168.18.9:5000', 'http://127.0.0.1:3001','http://localhost:3001'
+        'http://192.168.18.9:3000', 'http://192.168.18.9:5000',
+        'http://207.180.254.104', 'http://207.180.254.104:3000', 'http://207.180.254.104:3001',
+        'https://intellihire.com.pk', 'https://www.intellihire.com.pk',
     ]
     CORS(app,
          origins=_ALLOWED_ORIGINS,
