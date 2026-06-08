@@ -36,8 +36,8 @@ class Config:
     
     # AI API Keys
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
-    GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY') or 'AIzaSyBqOr81H2O5eGjGhKcZk9urE2SAfnTMTAI'
-    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY') or 'AIzaSyBqOr81H2O5eGjGhKcZk9urE2SAfnTMTAI'
+    GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
+    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY') 
     GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')  # GitHub Copilot API for question generation/scoring
     ELEVENLABS_API_KEY = os.environ.get('ELEVENLABS_API_KEY')
     
